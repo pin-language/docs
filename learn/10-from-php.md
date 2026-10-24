@@ -72,7 +72,9 @@ Ben: 80
 | `switch` / `match` | `if / elseif / else` |
 | `try` / `catch` | check first; panics are for bugs |
 | `PDO` | `db_open`, `db_exec`, `db_query`, `db_json` (SQLite; [chapter 11](11-database.md)) |
-| classes, closures, `null`, `include` | not yet |
+| `include`, `use`, namespaces | `import name;` and `name::fn()` ([chapter 12](12-modules-and-packages.md)) |
+| Composer packages | `pin get github.com/owner/repo@v1` + `pin.lock` |
+| classes, closures, `null` | not yet |
 | int overflow → float | wraps around (64-bit) |
 | PHP-FPM + nginx | `serve(8080, "handle")` — one native binary |
 

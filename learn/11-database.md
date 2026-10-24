@@ -1,6 +1,6 @@
 # 11. A database
 
-[Learn Pin](README.md) · previous: [10. Coming from PHP](10-from-php.md)
+[Learn Pin](README.md) · previous: [10. Coming from PHP](10-from-php.md) · next: [12. Modules and packages](12-modules-and-packages.md)
 
 Pin talks to SQLite: a whole database in one file, no server to install. (PostgreSQL is planned with the
 same functions.) On Linux, programs that use the database need SQLite's development files:

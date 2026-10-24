@@ -179,6 +179,20 @@ serve(8080, "handle");
   the body is not a JSON object. Nested values are skipped safely; there is no full `json_decode` yet.
 - There is no header API yet.
 
+## Modules and packages
+
+Each `.pn` file is a module. `import prices;` loads `prices.pn` from the project folder (the main file's
+folder; inside a package, the package's root), whichever file contains the import (`import util/text;` loads
+`util/text.pn`; `import util/text as t;` renames it); call its functions as
+`prices::price(...)`. Only functions marked `export` can be called from other files. Imported files may
+contain only functions and imports (no top-level code), and imports may not form a circle. All files compile
+into one binary.
+
+Packages are Git repositories: `pin get github.com/owner/repo@v1.0.0` writes the commit and a SHA-256 of the
+package's `.pn` files to `pin.lock`; `import github.com/owner/repo/module;` then uses it. The hash is checked on
+every build, so changed package code stops the build. See
+[Learn chapter 12](learn/12-modules-and-packages.md).
+
 ## Database (SQLite)
 
 `db_open($path)` gives a `db`; `db_exec`, `db_query` (→ `rows`, read with `db_next` and `db_int` /
@@ -194,6 +208,6 @@ SQLite's development files (`sudo apt install libsqlite3-dev`).
 ## Not in v0.1
 
 Classes and objects, `null` and `?Type`, `try`/`catch`/`throws`, lists of lists, maps of lists or maps,
-closures, `use`/modules (one file per program), sorting with a custom comparison, a full `json_decode`
+closures, sorting with a custom comparison, a full `json_decode`
 (nested objects and arrays), request headers, databases other than SQLite (PostgreSQL is next), `go`/`await`. Designs for most of these (Thai) are in
 [`design/`](design/).

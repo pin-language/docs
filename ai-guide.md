@@ -8,7 +8,7 @@ collector, so a lot of PHP habits do not compile. The compiler explains each err
 ## Loop
 
 ```bash
-pin check --json app.pn   # one JSON line per error: {"file","line","severity","message"}; {"ok":true} if clean
+pin check --json app.pn   # one JSON line per error: {"file","line","severity","message"}; {"file","ok":true} if clean
 pin run app.pn            # compile and run
 pin build app.pn -o app   # native binary
 ```
@@ -26,6 +26,11 @@ so fix and re-check. Exit code 0 = ok, 1 = compile error or run-time panic, 2 = 
 - Printing a float uses PHP's format: `380.5` → `380.5`, `380.0` → `380`, `1/3` → `0.33333333333333`.
   `json_encode` of a whole float keeps `.0` (`380.0`; PHP would print `380`). `true` prints `1`, `false` prints nothing.
 - Maps keep insertion order (like PHP arrays), in `foreach` and in `json_encode`.
+
+- Split a big program into files: `import prices;` loads `prices.pn` from the project folder (where the main
+  file is — the same path from every file, no `../`); call
+  `prices::price($x)`. Only `export function ...` can be called from another file. Imported files contain only
+  functions and imports. `import util/text as t;` for folders and short names.
 
 ## The rules that matter
 
@@ -233,7 +238,8 @@ answer from the request.
 | `try`/`catch`/`throw` | not yet — check first (`isset`, `??`, range checks) |
 | `switch`, `match` | `if / elseif / else` |
 | `function () {}`, `fn() =>` | named functions |
-| `include`, `use`, `namespace` | one file per program |
+| `include`, `use`, `namespace` | `import prices;` (loads prices.pn from the project folder) and `prices::fn()`; mark callable functions `export` |
+| Composer packages | `pin get github.com/owner/repo@v1.0.0`, then `import github.com/owner/repo/module;` |
 | `global`, `static`, `const`, `define` | parameters / local variables |
 | `strpos(...) === false` | `strpos(...) < 0` |
 | `explode`, `implode`, `sort`, `rsort` | the same (`sort($xs)` needs a list variable you own) |
@@ -270,6 +276,13 @@ Ints wrap around on overflow.
 | `expected int but got float` | the variable is int: use a new variable, `(int)`, or start it as `0.0` |
 | `cannot combine string and int` | join with `.`; convert with `intval()` / `strval()` |
 | `can reach its end without returning` | add a final `return` |
+| `X::f() is not exported` | add `export` before `function f` in that file |
+| there is no `import X;` in this file | add `import X;` at the top (each file lists its own imports) |
+| `import X: there is no file X.pn in the project folder` | import paths start at the main file's folder: `import dir/file;` |
+| `may only contain functions and imports` | move top-level code from the imported file into a function or the main file |
+| `import cycle: a.pn -> b.pn -> a.pn` | move what both need into a third file that both import |
+| `is not in pin.lock. Run: pin get ...` | run that `pin get` with a version, e.g. `@v1.0.0` |
+| `does not match pin.lock` | delete the package's cache folder named in the message; never just re-run `pin get` |
 | `both sides of ?: / ?? must have the same type` | convert one side with `strval()` / `intval()` / `(float)` |
 | `list index must be int but got float` | use `intdiv($a, $b)` instead of `/` |
 | `unset() works on maps` | build a new list without the items |

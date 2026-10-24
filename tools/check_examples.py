@@ -10,6 +10,8 @@ Each ```php block is checked according to an optional comment on the line before
   <!-- check: error -->       must NOT compile
   <!-- check: server -->      compile only (also the default for any block that calls serve())
   <!-- check: skip -->        not checked (a fragment)
+  <!-- check: file NAME -->   not run: saved as NAME (e.g. prices.pn or util/text.pn) next to every later
+                              example on the same page, so those can `import` it
 If the block is followed by a line "Output:" (or "Error:" / "Panic:") and a ```text block, that block must
 equal what the program printed: stdout for run, the compiler's message for error, stderr for panic.
 The file is always compiled as example.pn, so messages read "example.pn:LINE: error: ...".
@@ -57,9 +59,9 @@ def blocks(lines):
         while j >= 0 and lines[j].strip() == "":
             j -= 1
         if j >= 0:
-            c = re.match(r"\s*<!--\s*check:\s*(\w+)\s*-->", lines[j])
+            c = re.match(r"\s*<!--\s*check:\s*(\w+)(?:\s+([\w./-]+))?\s*-->", lines[j])
             if c:
-                kind = c.group(1)
+                kind = c.group(1) if c.group(1) != "file" else "file:" + (c.group(2) or "")
         # an Output:/Error:/Panic: label and a ```text block right after
         k = end + 1
         while k < len(lines) and lines[k].strip() == "":
@@ -78,8 +80,12 @@ def blocks(lines):
         i = end + 1
 
 
-def run(kind, code):
+def run(kind, code, files=None):
     with tempfile.TemporaryDirectory(prefix="pin-learn-") as d:
+        for name, text in (files or {}).items():
+            os.makedirs(os.path.dirname(os.path.join(d, name)), exist_ok=True)
+            with open(os.path.join(d, name), "w", encoding="utf-8") as f:
+                f.write(text)
         with open(os.path.join(d, "example.pn"), "w", encoding="utf-8") as f:
             f.write(code)
         b = subprocess.run([PIN, "build", "example.pn", "-o", "example"], cwd=d, capture_output=True, text=True)
@@ -112,14 +118,18 @@ def main():
     for path in files:
         lines = open(path, encoding="utf-8").read().split("\n")
         edits = []
+        files = {}
         for kind, s, e, out in blocks(lines):
             if kind == "skip":
+                continue
+            if kind.startswith("file:"):
+                files[kind[5:]] = "\n".join(lines[s:e]) + "\n"
                 continue
             checked += 1
             code = "\n".join(lines[s:e]) + "\n"
             if kind == "run" and "serve(" in code:
                 kind = "server"
-            ok, got = run(kind, code)
+            ok, got = run(kind, code, files)
             where = f"{path}:{s}"
             if not ok:
                 failures += 1
