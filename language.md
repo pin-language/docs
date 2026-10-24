@@ -30,6 +30,7 @@ pin check hello.pn        # errors only
 A variable gets its type from its first assignment and keeps it. Empty containers need the type
 written out:
 
+<!-- check: skip -->
 ```php
 list<int> $ids = [];
 map<string,int> $count = [];
@@ -39,6 +40,7 @@ $n = 1.5;          // compile error: assigning to $n: expected int but got float
 
 ## Variables must have a value on every path
 
+<!-- check: skip -->
 ```php
 if ($ok) { $msg = "yes"; }
 echo $msg;         // compile error: $msg may be used before it is assigned ...
@@ -101,6 +103,7 @@ echo json_encode($price);  // {"cake":89}
 A map has one value type, so a JSON object with mixed values is built as a string — `json_encode()`
 of a string gives a quoted, escaped JSON string:
 
+<!-- check: skip -->
 ```php
 return "{\"item\":" . json_encode($name) . ",\"qty\":" . $qty . "}";
 ```
@@ -160,6 +163,7 @@ an HTTP handler it answers 500 instead and the server keeps running. There is no
 
 ## HTTP server
 
+<!-- check: skip -->
 ```php
 function handle(string $method, string $path, string $body): string { ... }
 serve(8080, "handle");

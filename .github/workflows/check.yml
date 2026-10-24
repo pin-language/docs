@@ -1,0 +1,19 @@
+name: check examples
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  examples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang
+        run: sudo apt-get update && sudo apt-get install -y clang
+      - name: Install Pin (the installer clones github.com/pin-language/pin)
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/pin-language/pin/HEAD/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Every example compiles, runs and prints what the page says
+        run: python3 tools/check_examples.py learn/*.md ai-guide.md language.md
