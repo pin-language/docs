@@ -1,6 +1,7 @@
 # Writing Pin — guide for AI coding agents
 
-Pin v0.1. Give this file to the agent (or point it here). It is complete for v0.1: if a feature is not
+Pin v0.1. Give this file to the agent, or point it at the raw URL:
+`https://raw.githubusercontent.com/pin-language/docs/HEAD/ai-guide.md`. It is complete for v0.1: if a feature is not
 in this file, Pin does not have it yet. Pin looks like PHP 8 but is statically typed and has no garbage
 collector, so a lot of PHP habits do not compile. The compiler explains each error and the fix.
 

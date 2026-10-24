@@ -146,7 +146,7 @@ A panic is a run-time error the compiler could not rule out: index out of range,
 division by zero, `intdiv(PHP_INT_MIN, -1)`, an allocation too large, `(int)` of a bad float,
 `intval()` overflow. It prints `panic: ...` with the line and stops the program with exit code 1. Inside
 an HTTP handler it answers 500 instead and the server keeps running. There is no way to catch a panic;
-`try`/`catch` for expected errors is designed (`docs/design/error-handling.md`) but not built.
+`try`/`catch` for expected errors is designed ([`design/error-handling.md`](design/error-handling.md)) but not built.
 
 ## HTTP server
 
@@ -166,4 +166,4 @@ serve(8080, "handle");
 Classes and objects, `null` and `?Type`, `try`/`catch`/`throws`, `list<string>`, lists of lists, maps
 of maps, closures, `use`/modules (one file per program), `explode`, `implode`, `sort`, `json_decode`,
 request headers, database drivers, `go`/`await`. Designs for most of these (Thai) are in
-[`docs/design/`](design/).
+[`design/`](design/).
