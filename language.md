@@ -55,9 +55,11 @@ echo $msg;         // fine
 - Logic: `&& || !` — on `bool` only.
 - Strings: `.` joins, `.=` appends. `"Hello $name"` and `"{$name}s"` interpolate.
 - `$cond ? $a : $b`, and `$m[$k] ?? $default` / `$list[$i] ?? $default`.
-- Casts: `(int)` (from float, bool or string), `(float)` (from int), `(string)` (from int, float or
+- Casts: `(int)` (from float, bool or string), `(float)` (from int or string; `floatval()` does the same),
+  `(string)` (from int, float or
   bool). `(int)` of a NAN, INF or out-of-range float panics. There is no `(bool)` cast — compare instead
-  (`$n != 0`) — and no `(float)` of a string yet.
+  (`$n != 0`). From a string, `(int)`/`intval()` and `(float)`/`floatval()` read the leading number (`"2.5kg"` →
+  2.5, `"abc"` → 0); an int too big for 64 bits becomes `PHP_INT_MAX` / `PHP_INT_MIN`, like PHP.
 - `wrapping_add($a, $b)`, `wrapping_sub`, `wrapping_mul`: say "wrapping is intended". Today plain `+ - *`
   wrap too; once overflow checks arrive, only these will.
 
@@ -129,7 +131,7 @@ There are no global variables. Functions only see their parameters.
 
 `strlen`, `substr` (negative start/length like PHP), `strpos` (returns **-1** when not found, not
 `false`), `str_contains`, `str_starts_with`, `str_ends_with`, `str_repeat`, `strtolower`, `strtoupper`
-(ASCII letters only, like PHP 8.2+), `trim`, `intval` (panics if the number does not fit in an int),
+(ASCII letters only, like PHP 8.2+), `trim`, `intval` / `floatval` (leading number; too-big ints saturate at `PHP_INT_MAX` / `PHP_INT_MIN`),
 `strval`.
 
 All of these count **bytes**, like PHP: `strlen("ไทย")` is 9. Character-aware functions (`mb_*`,
@@ -149,8 +151,8 @@ walks over it.
 ## Panics
 
 A panic is a run-time error the compiler could not rule out: index out of range, missing map key,
-division by zero, `intdiv(PHP_INT_MIN, -1)`, an allocation too large, `(int)` of a bad float,
-`intval()` overflow. It prints `panic: ...` with the line and stops the program with exit code 1. Inside
+division by zero, `intdiv(PHP_INT_MIN, -1)`, an allocation too large, `(int)` of a bad float.
+It prints `panic: ...` with the line and stops the program with exit code 1. Inside
 an HTTP handler it answers 500 instead and the server keeps running. There is no way to catch a panic;
 `try`/`catch` for expected errors is designed ([`design/error-handling.md`](design/error-handling.md)) but not built.
 
@@ -164,7 +166,8 @@ serve(8080, "handle");
 - The handler must have exactly this signature. Its return value is the response body
   (`Content-Type: application/json`). `http_status(404)` sets the status for this response.
 - `$path` includes the query string as sent. `url_path($path)` drops it; `query_param($path, "k")` reads one
-  value (decoded, `""` if absent). For a form body use `form_param($body, "k")`.
+  value (decoded, `""` if absent); `query_has($path, "k")` tells absent from empty. For a form body use
+  `form_param($body, "k")` / `form_has($body, "k")`.
 - JSON bodies: `json_has($body, "k")`, `json_string`, `json_int`, `json_float`, `json_bool` read one top-level
   key of a JSON object and return `""` / `0` / `0.0` / `false` when the key is missing, has another type, or
   the body is not a JSON object. Nested values are skipped safely; there is no full `json_decode` yet.

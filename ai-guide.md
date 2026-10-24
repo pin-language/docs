@@ -50,8 +50,9 @@ so fix and re-check. Exit code 0 = ok, 1 = compile error or run-time panic, 2 = 
 14. **Both sides of `?:` and `??` have the same type.** `$n < 10 ? "0" . $n : strval($n)`, not `... : $n`.
 15. **`unset()` works on maps only.** To drop items from a list, build a new list without them.
 16. **`/` always gives a float** — for list indexes and counts use `intdiv($a, $b)`.
-17. **`intval()` of text that is not a number gives 0; of a number too big for an int it panics** (in a
-    server: a 500). Validate input ranges after `intval()`.
+17. **Numbers from text never fail.** `intval("abc")` is 0; a number too big for an int becomes
+    `PHP_INT_MAX` / `PHP_INT_MIN` (like PHP), so your range check rejects it. `floatval("2.5kg")` and
+    `(float)"2.5"` read the leading number. Always range-check numbers that come from a request.
 
 ## Idioms
 
@@ -190,7 +191,8 @@ Request helpers (all take strings and never fail on bad input):
 - `json_has($body, "key")` — bool. `json_string` → string (`""`), `json_int` → int (`0`), `json_float` →
   float (`0.0`), `json_bool` → bool (`false`), with the default when the key is missing, has another type, or
   the body is not a JSON object. Only top-level keys of an object are read; nested objects and arrays are
-  skipped safely. `json_int` of a number too big for an int panics (a 500), like `intval`.
+  skipped safely. `json_int` of a number too big for an int gives `PHP_INT_MAX` / `PHP_INT_MIN`, like `intval`.
+- `query_has($path, "key")` / `form_has($body, "key")` tell "missing" from "present but empty" (`?limit=`).
 
 The response is always `Content-Type: application/json`; the body format is yours. There is no header
 access and no database yet. Handlers cannot keep state between requests (no globals): compute each
@@ -224,8 +226,8 @@ answer from the request.
 `count fill copy isset unset array_key_exists json_encode strlen substr strpos str_contains
 str_starts_with str_ends_with str_repeat strtolower strtoupper trim intval strval sqrt intdiv
 wrapping_add wrapping_sub wrapping_mul explode implode sort rsort serve http_status url_path query_param
-form_param json_has json_string json_int json_float json_bool` · constants `PHP_INT_MAX PHP_INT_MIN PHP_EOL`
-· casts `(int)` from float/bool/string, `(float)` from int, `(string)` from int/float/bool.
+form_param query_has form_has floatval json_has json_string json_int json_float json_bool` · constants `PHP_INT_MAX PHP_INT_MIN PHP_EOL`
+· casts `(int)` from float/bool/string, `(float)` from int/string, `(string)` from int/float/bool.
 
 String functions count bytes (`strlen("ไทย")` is 9). `/` always gives a float; use `intdiv($a, $b)`.
 Ints wrap around on overflow.
