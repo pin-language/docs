@@ -139,6 +139,8 @@ All of these count **bytes**, like PHP: `strlen("ไทย")` is 9. Character-aw
 
 ## Other built-ins
 
+The [built-in reference](reference/README.md) has every function with an example and its output.
+
 `count`, `fill($n, $value)`, `copy`, `isset($m[$k])`, `array_key_exists`, `unset($m[$k])`,
 `json_encode` (int, float, bool, string, list, map), `sqrt`, `intdiv`, `echo` with several arguments.
 
