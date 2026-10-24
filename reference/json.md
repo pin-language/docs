@@ -74,7 +74,7 @@ Somก||
 
 - `""` when the key is missing, the value is not a string, or the text is not a JSON object.
 - Escapes are decoded (`\n`, `\"`, `\uXXXX` including surrogate pairs).
-- **PHP:** Pin has no `json_decode` yet; these functions read one top-level key at a time. Nested values are skipped safely.
+- **PHP:** Instead of `json_decode($body, true)['name']`. Pin reads top-level keys of a JSON object with these functions; nested objects and arrays are skipped safely (a full `json_decode` for nested data comes later).
 
 ## json_int
 
