@@ -1,6 +1,6 @@
 # Learn Pin
 
-Ten short chapters, from your first program to a JSON web API. Each one has runnable examples with their
+Eleven short chapters, from your first program to a JSON web API backed by a database. Each one has runnable examples with their
 real output — every example on these pages is compiled and run automatically, so what you read is what
 Pin does — and ends with a small exercise and an answer.
 
@@ -18,6 +18,7 @@ You should know some programming; knowing PHP helps, since Pin keeps most of its
 | 8 | [A web API](08-web-api.md) | `serve`, routing, query strings, JSON bodies, status codes |
 | 9 | [Errors and panics](09-errors-and-panics.md) | reading errors, `--json`, writing code that does not panic |
 | 10 | [Coming from PHP](10-from-php.md) | translating a script, a PHP → Pin checklist |
+| 11 | [A database](11-database.md) | SQLite: queries, rows, JSON results, an API that stores data |
 
 Then: the [built-in reference](../reference/README.md) for every function, and the
 [language guide](../language.md) for the complete rules. Using an AI agent? Give it the

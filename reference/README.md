@@ -27,3 +27,7 @@ New to Pin? Start with the [language guide](../language.md). Writing Pin with an
 ## [HTTP](http.md)
 
 [`serve`](http.md#serve), [`http_status`](http.md#http_status), [`url_path`](http.md#url_path), [`query_param`](http.md#query_param), [`query_has`](http.md#query_has), [`form_param`](http.md#form_param), [`form_has`](http.md#form_has)
+
+## [Database (SQLite)](database.md)
+
+[`db_open`](database.md#db_open), [`db_exec`](database.md#db_exec), [`db_query`](database.md#db_query), [`db_next`](database.md#db_next), [`db_int`](database.md#db_int), [`db_float`](database.md#db_float), [`db_string`](database.md#db_string), [`db_is_null`](database.md#db_is_null), [`db_json`](database.md#db_json), [`db_last_id`](database.md#db_last_id), [`db_error`](database.md#db_error)

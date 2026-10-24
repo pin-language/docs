@@ -178,6 +178,16 @@ serve(8080, "handle");
   key of a JSON object and return `""` / `0` / `0.0` / `false` when the key is missing, has another type, or
   the body is not a JSON object. Nested values are skipped safely; there is no full `json_decode` yet.
 - There is no header API yet.
+
+## Database (SQLite)
+
+`db_open($path)` gives a `db`; `db_exec`, `db_query` (→ `rows`, read with `db_next` and `db_int` /
+`db_float` / `db_string` / `db_is_null`) and `db_json` run SQL. The SQL must be a string literal and values
+go in `?` placeholders, so SQL injection cannot compile. `db` and `rows` are owned values: they close when
+they go out of scope (also when a handler panics), move on `=`, and are lent to functions. Constraint
+violations make `db_exec` return -1 (`db_error` explains); other SQL errors panic. Details:
+[reference/database.md](reference/database.md). On Linux, building a program that uses the database needs
+SQLite's development files (`sudo apt install libsqlite3-dev`).
 - One thread per CPU core (`PN_THREADS=n` to change). Keep-alive and pipelining are supported.
 - Limits: 64 KB of headers, 64 MB of body. No TLS, no HTTP/2, no timeouts: **for local testing only.**
 
@@ -185,5 +195,5 @@ serve(8080, "handle");
 
 Classes and objects, `null` and `?Type`, `try`/`catch`/`throws`, lists of lists, maps of lists or maps,
 closures, `use`/modules (one file per program), sorting with a custom comparison, a full `json_decode`
-(nested objects and arrays), request headers, database drivers, `go`/`await`. Designs for most of these (Thai) are in
+(nested objects and arrays), request headers, databases other than SQLite (PostgreSQL is next), `go`/`await`. Designs for most of these (Thai) are in
 [`design/`](design/).

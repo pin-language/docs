@@ -1,6 +1,6 @@
 # 10. Coming from PHP
 
-[Learn Pin](README.md) · previous: [9. Errors and panics](09-errors-and-panics.md)
+[Learn Pin](README.md) · previous: [9. Errors and panics](09-errors-and-panics.md) · next: [11. A database](11-database.md)
 
 ## Translating a script
 
@@ -71,6 +71,7 @@ Ben: 80
 | `json_decode($body, true)['x']` | `json_string($body, "x")`, `json_int`, `json_float`, `json_bool`, `json_has` |
 | `switch` / `match` | `if / elseif / else` |
 | `try` / `catch` | check first; panics are for bugs |
+| `PDO` | `db_open`, `db_exec`, `db_query`, `db_json` (SQLite; [chapter 11](11-database.md)) |
 | classes, closures, `null`, `include` | not yet |
 | int overflow → float | wraps around (64-bit) |
 | PHP-FPM + nginx | `serve(8080, "handle")` — one native binary |
