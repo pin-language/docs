@@ -1,7 +1,7 @@
 # Writing Pin — guide for AI coding agents
 
-Pin v0.1. Give this file to the agent, or point it at the raw URL:
-`https://raw.githubusercontent.com/pin-language/docs/HEAD/ai-guide.md`. It is complete for v0.1: if a feature is not
+Pin 0.4. Give this file to the agent, or point it at the raw URL:
+`https://raw.githubusercontent.com/pin-language/docs/HEAD/ai-guide.md`. It is complete for this version: if a feature is not
 in this file, Pin does not have it yet. Pin looks like PHP 8 but is statically typed and has no garbage
 collector, so a lot of PHP habits do not compile. The compiler explains each error and the fix.
 
@@ -286,6 +286,6 @@ Ints wrap around on overflow.
 | `both sides of ?: / ?? must have the same type` | convert one side with `strval()` / `intval()` / `(float)` |
 | `list index must be int but got float` | use `intdiv($a, $b)` instead of `/` |
 | `unset() works on maps` | build a new list without the items |
-| `… is not in Pin v0.1` | use the replacement in the message / the table above |
+| `… is not in Pin yet` | use the replacement in the message / the table above |
 | run time `panic: key not found` | `isset($m[$k])` or `$m[$k] ?? default` |
 | run time `panic: index N out of range` | check `$i < count($xs)` |

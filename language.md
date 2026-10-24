@@ -1,6 +1,6 @@
-# The Pin language guide (v0.1)
+# The Pin language guide (0.4)
 
-Pin reads like PHP 8 and compiles to a native binary. This guide covers everything the v0.1 compiler
+Pin reads like PHP 8 and compiles to a native binary. This guide covers everything the 0.4 compiler
 accepts. Anything not listed here is not supported yet.
 
 ## Files and running
@@ -205,7 +205,7 @@ SQLite's development files (`sudo apt install libsqlite3-dev`).
 - One thread per CPU core (`PN_THREADS=n` to change). Keep-alive and pipelining are supported.
 - Limits: 64 KB of headers, 64 MB of body. No TLS, no HTTP/2, no timeouts: **for local testing only.**
 
-## Not in v0.1
+## Not in Pin yet
 
 Classes and objects, `null` and `?Type`, `try`/`catch`/`throws`, lists of lists, maps of lists or maps,
 closures, sorting with a custom comparison, a full `json_decode`

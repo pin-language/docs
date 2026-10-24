@@ -50,7 +50,7 @@ try {
 Error:
 
 ```text
-example.pn:1: error: try/catch is not in Pin v0.1 yet (designed: pin-language/docs design/error-handling.md); check values before using them, e.g. isset($m[$k]) or $m[$k] ?? default
+example.pn:1: error: try/catch is not in Pin yet (designed: pin-language/docs design/error-handling.md); check values before using them, e.g. isset($m[$k]) or $m[$k] ?? default
 ```
 
 <!-- check: error -->
