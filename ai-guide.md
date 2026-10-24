@@ -29,8 +29,8 @@ so fix and re-check. Exit code 0 = ok, 1 = compile error or run-time panic, 2 = 
 
 ## The rules that matter
 
-1. **Types.** `int float bool string list<T> map<K,V> void`. `T` ∈ int/float/bool. `K` ∈ int/string,
-   `V` ∈ int/float/bool/string. No nesting (`list<list<int>>`, `list<string>`, map of lists: no).
+1. **Types.** `int float bool string list<T> map<K,V> void`. `T` ∈ int/float/bool/string. `K` ∈ int/string,
+   `V` ∈ int/float/bool/string. No nesting (`list<list<int>>`, a map of lists: no).
 2. **Every parameter and return type is written.** `function f(int $n, list<int> $xs): string`.
 3. **A variable keeps the type of its first value.** Empty containers need the type:
    `list<int> $ids = [];` `map<string,int> $count = [];`
@@ -96,22 +96,13 @@ function user_json(int $id, string $name): string {
 }
 ```
 
-Sort a list (no `sort` yet): insertion sort on a copy — fine up to a few thousand items.
+Sorting: `sort($xs)` / `rsort($xs)` sort a list variable you own, in place (ints, floats, bools, or strings
+by byte order). A parameter is a loan, so copy it first.
 
 ```php
-function sorted(list<int> $xs): list<int> {
-    $a = copy($xs);
-    for ($i = 1; $i < count($a); $i++) {
-        $v = $a[$i];
-        $j = $i - 1;
-        while ($j >= 0 && $a[$j] > $v) { $a[$j + 1] = $a[$j]; $j--; }
-        $a[$j + 1] = $v;
-    }
-    return $a;
-}
-
 function median(list<int> $xs): float {     // assumes count($xs) > 0
-    $s = sorted($xs);
+    $s = copy($xs);
+    sort($s);
     $n = count($s);
     $mid = intdiv($n, 2);
     return $n % 2 == 1 ? (float)$s[$mid] : ($s[$mid - 1] + $s[$mid]) / 2;
@@ -129,7 +120,7 @@ function baht(int $satang): string {        // 123450 -> "1234.50", -5 -> "-0.05
 }
 ```
 
-Top N from a map (no `sort` yet): pick the best not yet used, N times.
+Top N from a map by value (`sort` has no custom comparison yet): pick the best not yet used, N times.
 
 ```php
 function top3(map<string,int> $counts): string {
@@ -149,33 +140,43 @@ function top3(map<string,int> $counts): string {
 }
 ```
 
-Splitting a string (no `explode` yet):
+Strings in lists: `explode`, `implode`, `list<string>`.
 
 ```php
 function count_words(string $text): map<string,int> {
     map<string,int> $counts = [];
-    $start = 0;
-    $len = strlen($text);
-    while ($start < $len) {
-        $sp = strpos(substr($text, $start), " ");      // -1 when not found (not false)
-        $end = $sp < 0 ? $len : $start + $sp;
-        $w = substr($text, $start, $end - $start);
-        if (strlen($w) > 0) { $counts[$w] += 1; }
-        $start = $end + 1;
+    foreach (explode(" ", $text) as $w) {          // explode($separator, $string) like PHP
+        if (strlen($w) > 0) { $counts[strtolower($w)] += 1; }
     }
     return $counts;
 }
+
+function initials(list<string> $names): string {
+    list<string> $out = [];
+    foreach ($names as $n) { $out[] = strtoupper(substr($n, 0, 1)); }
+    sort($out);
+    return implode(",", $out);                     // implode works on list<string|int|float>
+}
 ```
 
-HTTP API:
+HTTP API — GET with a query string, POST with a JSON or form body:
 
 ```php
 function handle(string $method, string $path, string $body): string {   // exactly this signature
-    if ($method == "GET" && $path == "/health") { return "{\"ok\":true}"; }
-    if (str_starts_with($path, "/items/")) {
-        $id = intval(substr($path, 7));
-        if ($id <= 0) { http_status(400); return "{\"error\":\"bad id\"}"; }
-        return "{\"id\":" . $id . "}";
+    $route = url_path($path);                       // "/quote?item=cake" -> "/quote"
+    if ($method == "GET" && $route == "/health") { return "{\"ok\":true}"; }
+    if ($method == "GET" && $route == "/quote") {
+        $item = query_param($path, "item");         // "" when missing; %XX and + are decoded
+        $qty = intval(query_param($path, "qty"));
+        if ($item == "" || $qty < 1 || $qty > 20) { http_status(400); return "{\"error\":\"item and qty 1-20\"}"; }
+        return "{\"item\":" . json_encode($item) . ",\"qty\":" . $qty . "}";
+    }
+    if ($method == "POST" && $route == "/orders") {
+        // body {"item":"cake","qty":2} — top-level keys only
+        if (!json_has($body, "item")) { http_status(400); return "{\"error\":\"item is required\"}"; }
+        $item = json_string($body, "item");         // "" if missing or not a string
+        $qty = json_int($body, "qty");              // 0 if missing or not an integer
+        return "{\"created\":" . json_encode($item) . ",\"qty\":" . $qty . "}";
     }
     http_status(404);
     return "{\"error\":\"not found\"}";
@@ -183,18 +184,17 @@ function handle(string $method, string $path, string $body): string {   // exact
 serve(8080, "handle");    // last statement; blocks forever
 ```
 
-The response is always `Content-Type: application/json`; the body format is yours. `$path` includes any
-query string (`/health?x=1`), so strip it first if you route on exact paths:
+Request helpers (all take strings and never fail on bad input):
+- `url_path($path)` — the path without `?query`.
+- `query_param($path, "key")`, `form_param($body, "key")` — the decoded value, `""` if absent.
+- `json_has($body, "key")` — bool. `json_string` → string (`""`), `json_int` → int (`0`), `json_float` →
+  float (`0.0`), `json_bool` → bool (`false`), with the default when the key is missing, has another type, or
+  the body is not a JSON object. Only top-level keys of an object are read; nested objects and arrays are
+  skipped safely. `json_int` of a number too big for an int panics (a 500), like `intval`.
 
-```php
-function route(string $path): string {
-    $q = strpos($path, "?");
-    return $q < 0 ? $path : substr($path, 0, $q);
-}
-```
-
-There is no header access, no body parsing (`json_decode`), no database yet. Handlers cannot keep state
-between requests (no globals): compute each answer from the request.
+The response is always `Content-Type: application/json`; the body format is yours. There is no header
+access and no database yet. Handlers cannot keep state between requests (no globals): compute each
+answer from the request.
 
 ## PHP → Pin
 
@@ -210,8 +210,10 @@ between requests (no globals): compute each answer from the request.
 | `include`, `use`, `namespace` | one file per program |
 | `global`, `static`, `const`, `define` | parameters / local variables |
 | `strpos(...) === false` | `strpos(...) < 0` |
-| `explode`, `implode`, `sort`, `array_map`, `in_array`, `max`, `sprintf`… | write the loop (see idioms); the error message names the replacement |
-| `json_decode` | not yet |
+| `explode`, `implode`, `sort`, `rsort` | the same (`sort($xs)` needs a list variable you own) |
+| `array_map`, `in_array`, `max`, `sprintf`, `usort`… | write the loop; the error message names the replacement |
+| `$_GET["x"]`, `$_POST["x"]` | `query_param($path, "x")`, `form_param($body, "x")` |
+| `json_decode($body, true)["x"]` | `json_string($body, "x")` / `json_int` / `json_float` / `json_bool` / `json_has` (top level only) |
 | `(bool)$x`, truthiness | compare explicitly |
 | `$s + 1` on strings | `intval($s) + 1` |
 | `list($a, $b) = ...` | assign separately |
@@ -221,7 +223,8 @@ between requests (no globals): compute each answer from the request.
 
 `count fill copy isset unset array_key_exists json_encode strlen substr strpos str_contains
 str_starts_with str_ends_with str_repeat strtolower strtoupper trim intval strval sqrt intdiv
-wrapping_add wrapping_sub wrapping_mul serve http_status` · constants `PHP_INT_MAX PHP_INT_MIN PHP_EOL`
+wrapping_add wrapping_sub wrapping_mul explode implode sort rsort serve http_status url_path query_param
+form_param json_has json_string json_int json_float json_bool` · constants `PHP_INT_MAX PHP_INT_MIN PHP_EOL`
 · casts `(int)` from float/bool/string, `(float)` from int, `(string)` from int/float/bool.
 
 String functions count bytes (`strlen("ไทย")` is 9). `/` always gives a float; use `intdiv($a, $b)`.

@@ -23,7 +23,7 @@ pin check hello.pn        # errors only
 | `float` | `1.5`, `2.0e10` | 64-bit IEEE |
 | `bool` | `true`, `false` | |
 | `string` | `"hi $name"`, `'raw'` | bytes; Thai/UTF-8 text is kept as is |
-| `list<T>` | `[1, 2, 3]` | `T` is `int`, `float` or `bool` |
+| `list<T>` | `[1, 2, 3]`, `["a", "b"]` | `T` is `int`, `float`, `bool` or `string` |
 | `map<K,V>` | `["a" => 1]` | `K` is `int` or `string`; `V` is `int`, `float`, `bool` or `string`; keeps insertion order |
 | `void` | | return type only |
 
@@ -140,6 +140,12 @@ All of these count **bytes**, like PHP: `strlen("ไทย")` is 9. Character-aw
 `count`, `fill($n, $value)`, `copy`, `isset($m[$k])`, `array_key_exists`, `unset($m[$k])`,
 `json_encode` (int, float, bool, string, list, map), `sqrt`, `intdiv`, `echo` with several arguments.
 
+Lists of strings: `explode($separator, $s)` gives a `list<string>` (an empty separator panics, like PHP);
+`implode($glue, $list)` joins a `list<string>`, `list<int>` or `list<float>`. `sort($xs)` and `rsort($xs)`
+sort a list variable you own in place (numbers by value, strings by byte order); to sort a parameter,
+`copy()` it first. Changing a `list<string>` element or sorting a list is not allowed while a `foreach`
+walks over it.
+
 ## Panics
 
 A panic is a run-time error the compiler could not rule out: index out of range, missing map key,
@@ -157,13 +163,18 @@ serve(8080, "handle");
 
 - The handler must have exactly this signature. Its return value is the response body
   (`Content-Type: application/json`). `http_status(404)` sets the status for this response.
-- `$path` includes the query string as sent; there is no header or query API yet.
+- `$path` includes the query string as sent. `url_path($path)` drops it; `query_param($path, "k")` reads one
+  value (decoded, `""` if absent). For a form body use `form_param($body, "k")`.
+- JSON bodies: `json_has($body, "k")`, `json_string`, `json_int`, `json_float`, `json_bool` read one top-level
+  key of a JSON object and return `""` / `0` / `0.0` / `false` when the key is missing, has another type, or
+  the body is not a JSON object. Nested values are skipped safely; there is no full `json_decode` yet.
+- There is no header API yet.
 - One thread per CPU core (`PN_THREADS=n` to change). Keep-alive and pipelining are supported.
 - Limits: 64 KB of headers, 64 MB of body. No TLS, no HTTP/2, no timeouts: **for local testing only.**
 
 ## Not in v0.1
 
-Classes and objects, `null` and `?Type`, `try`/`catch`/`throws`, `list<string>`, lists of lists, maps
-of maps, closures, `use`/modules (one file per program), `explode`, `implode`, `sort`, `json_decode`,
-request headers, database drivers, `go`/`await`. Designs for most of these (Thai) are in
+Classes and objects, `null` and `?Type`, `try`/`catch`/`throws`, lists of lists, maps of lists or maps,
+closures, `use`/modules (one file per program), sorting with a custom comparison, a full `json_decode`
+(nested objects and arrays), request headers, database drivers, `go`/`await`. Designs for most of these (Thai) are in
 [`design/`](design/).
