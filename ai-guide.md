@@ -1,6 +1,6 @@
 # Writing Pin — guide for AI coding agents
 
-Pin 0.4. Give this file to the agent, or point it at the raw URL:
+Pin 0.5. Give this file to the agent, or point it at the raw URL:
 `https://raw.githubusercontent.com/pin-language/docs/HEAD/ai-guide.md`. It is complete for this version: if a feature is not
 in this file, Pin does not have it yet. Pin looks like PHP 8 but is statically typed and has no garbage
 collector, so a lot of PHP habits do not compile. The compiler explains each error and the fix.
@@ -29,20 +29,22 @@ so fix and re-check. Exit code 0 = ok, 1 = compile error or run-time panic, 2 = 
 
 - Split a big program into files: `import prices;` loads `prices.pn` from the project folder (where the main
   file is — the same path from every file, no `../`); call
-  `prices::price($x)`. Only `export function ...` can be called from another file. Imported files contain only
-  functions and imports. `import util/text as t;` for folders and short names.
+  `prices::price($x)`. Only `export function ...` / `export class ...` can be used from another file
+  (`new prices::Item(...)`, type `prices::Item`). Imported files contain only functions, classes and imports.
+  `import util/text as t;` for folders and short names.
 
 ## The rules that matter
 
-1. **Types.** `int float bool string list<T> map<K,V> void`. `T` ∈ int/float/bool/string. `K` ∈ int/string,
-   `V` ∈ int/float/bool/string. No nesting (`list<list<int>>`, a map of lists: no).
+1. **Types.** `int float bool string list<T> map<K,V> void`, plus your classes. `K` ∈ int/string; `T` and `V`
+   can be any type, nested: `list<Order>`, `list<list<int>>`, `map<string,list<string>>`, `map<int,User>`.
 2. **Every parameter and return type is written.** `function f(int $n, list<int> $xs): string`.
 3. **A variable keeps the type of its first value.** Empty containers need the type:
    `list<int> $ids = [];` `map<string,int> $count = [];`
 4. **Conditions are bool.** `if ($n != 0)`, `if (count($xs) > 0)`, `if (strlen($s) > 0)` — never `if ($n)`.
 5. **A variable must have a value on every path before use.** Initialise before `if` / loops.
-6. **Lists and maps move on `=`.** After `$b = $a;` do not use `$a`. Want two? `$b = copy($a);`
-7. **Parameters are read-only loans.** Do not change, move or return a list/map parameter; copy it:
+6. **Lists, maps and objects move on `=`.** After `$b = $a;` do not use `$a`. Want two? `$b = copy($a);`
+7. **Parameters are read-only loans.** To change the caller's value, declare `&` and write `&` at the call
+   too: `function discount(Order &$o): void {...}` … `discount(&$order);`. Otherwise copy:
    `$out = copy($xs);` then change `$out` and `return $out;`.
 8. **Do not add to / remove from / replace a list or map inside a `foreach` over it.** Collect changes in
    another variable, apply after the loop.
@@ -51,13 +53,60 @@ so fix and re-check. Exit code 0 = ok, 1 = compile error or run-time panic, 2 = 
 11. **Non-void functions must return on every path.**
 12. **Missing map key / bad index panic.** Use `isset($m[$k])` or `$m[$k] ?? $default`.
 13. **A map literal has one value type.** `["a" => 1, "b" => 2.5]` becomes `map<string,float>`;
-    `["a" => 1, "b" => "x"]` is an error — build mixed JSON objects as strings (idiom below).
+    `["a" => 1, "b" => "x"]` is an error — for a JSON object with mixed values, use a class and
+    `json_encode($obj)` (see Classes).
 14. **Both sides of `?:` and `??` have the same type.** `$n < 10 ? "0" . $n : strval($n)`, not `... : $n`.
 15. **`unset()` works on maps only.** To drop items from a list, build a new list without them.
 16. **`/` always gives a float** — for list indexes and counts use `intdiv($a, $b)`.
 17. **Numbers from text never fail.** `intval("abc")` is 0; a number too big for an int becomes
     `PHP_INT_MAX` / `PHP_INT_MIN` (like PHP), so your range check rejects it. `floatval("2.5kg")` and
     `(float)"2.5"` read the leading number. Always range-check numbers that come from a request.
+
+## Classes
+
+```php
+class Item {
+    public function __construct(public string $name, public int $price) {}   // promoted: declares + sets
+}
+
+class Order {
+    public int $id;
+    public list<Item> $items = [];          // defaults are literals: 0, "", false, [], [1, 2]
+    private int $discount = 0;              // private: only Order's methods; left out of json_encode
+
+    function __construct(int $id) { $this->id = $id; }      // must set every property without a default
+
+    function add(string $name, int $price): void { $this->items[] = new Item($name, $price); }
+
+    function total(): int {
+        $t = 0;
+        foreach ($this->items as $it) { $t += $it->price; }
+        return $t - $this->discount;
+    }
+}
+
+$o = new Order(1);
+$o->add("tea", 40);
+$o->items[0]->price = 35;                   // change through a path
+echo $o->total(), "\n";
+echo json_encode($o), "\n";               // {"id":1,"items":[{"name":"tea","price":35}]}
+```
+
+- Objects are **values with one owner**, like lists: `$b = $a;` moves, `copy($a)` makes a separate one, a
+  parameter `Order $o` is read-only, `Order &$o` (called with `&$order`) may change it.
+- A method that assigns `$this->...` (or calls such a method) is a **changing method**. You can call it on
+  your own variables, `&` parameters, `foreach (... as &$x)` items and paths into them — not on read-only
+  parameters or plain `foreach` variables.
+- `$u = $users[0];` (an object, list or map read from a list, map or property) **borrows** it read-only, no
+  copy. While `$u` is still used later, `$users` cannot be changed. Need your own? `$u = copy($users[0]);`
+- Change items in place: `foreach ($users as &$u) { $u->visits += 1; }`
+- No inheritance, interfaces, static members, `null` or `?->` yet. A class cannot hold itself (use
+  `list<Node>` or an id). `==` does not compare objects: compare properties.
+- Promote only `int float bool string` constructor parameters. For a list, map or object property, declare it
+  (`public list<int> $scores = [];`) and set it with `$this->scores = copy($scores);` in `__construct`.
+- `&` also takes paths: `drop_lowest(&$students[1])`, `f(&$o->items)`.
+- `json_encode` writes public properties in declaration order (promoted ones sit where `__construct` is in the
+  class body); objects, lists of objects and maps of objects all work. Strings: `"{$o->name}"`, `"$o->name"`, `"{$o->items[0]->name}"`.
 
 ## Idioms
 
@@ -96,9 +145,12 @@ function find(list<int> $xs, int $want): int {
     return -1;
 }
 
-// mixed JSON object: build the string; json_encode() a string to quote/escape it
+// mixed JSON object: a class, then json_encode()
+class UserOut {
+    public function __construct(public int $id, public string $name, public bool $admin) {}
+}
 function user_json(int $id, string $name): string {
-    return "{\"id\":" . $id . ",\"name\":" . json_encode($name) . "}";
+    return json_encode(new UserOut($id, $name, false));     // {"id":7,"name":"Ann","admin":false}
 }
 ```
 
@@ -234,7 +286,8 @@ answer from the request.
 | `array(1, 2)`, `[]` untyped | `[1, 2]`, `list<int> $a = [];` |
 | `$a = ["x" => 1, "y" => "s"]` (mixed) | one value type per map; build JSON strings for mixed objects |
 | `null`, `?int` | not yet — use `-1`, `""`, empty list, or a separate `bool` |
-| `class`, `new`, `->` | not yet — functions + maps |
+| `class`, `new`, `->`, `$this` | the same; no `extends` / `interface` / `static`; objects move on `=` |
+| `function f(array &$a)`, `f($a)` | `function f(list<int> &$a)`, `f(&$a)` — `&` at the call too |
 | `try`/`catch`/`throw` | not yet — check first (`isset`, `??`, range checks) |
 | `switch`, `match` | `if / elseif / else` |
 | `function () {}`, `fn() =>` | named functions |
@@ -250,7 +303,8 @@ answer from the request.
 | `(bool)$x`, truthiness | compare explicitly |
 | `$s + 1` on strings | `intval($s) + 1` |
 | `list($a, $b) = ...` | assign separately |
-| `foreach ($xs as &$x)` | `for ($i = 0; $i < count($xs); $i++) { $xs[$i] ... }` |
+| `foreach ($xs as &$x)` | the same (not for bools); the `&` variable is gone after the loop |
+| default parameter values `int $n = 1` | not yet — pass every argument |
 
 ## Built-ins (complete list)
 
@@ -269,7 +323,15 @@ Ints wrap around on overflow.
 | `may have been moved on line N (on one path…)` | copy in that branch, or reassign after the `if` |
 | `is moved inside a loop` | move after the loop, `copy()`, or `break` right after the move |
 | `may be used before it is assigned` | give it a value before the `if`/loop |
-| `is a parameter lent to this code, so it cannot be changed` | `$copy = copy($p);` and work on `$copy` |
+| `is a parameter lent to this function read-only` | declare `T &$p` and call with `&$x`, or `$copy = copy($p);` |
+| `can change its argument $x, so write f(&$x)` | add `&` at the call |
+| `borrows from it and is used again on line N` | finish using the borrowed variable first, or `copy()` it |
+| `is borrowed (read-only) from another value` | change the original path (`$users[$i]->x = ...`) |
+| `belongs to the value it is part of and cannot be moved out` | `copy($o->items)` |
+| `does not set $this->x on every path` | set it in `__construct` in every branch, or give a default |
+| `has no __construct(), so every property needs a default` | add defaults, or a `__construct` |
+| `is a foreach variable lent read-only` | `foreach (... as &$x)` |
+| `cannot store $x inside itself` | store `copy($x)` |
 | `while a foreach is looping over it` | collect into another list/map, apply after the loop |
 | `an empty [] needs a type` | `list<int> $a = [];` / `map<string,int> $m = [];` |
 | `condition must be bool` | write the comparison: `$n != 0` |
@@ -279,7 +341,7 @@ Ints wrap around on overflow.
 | `X::f() is not exported` | add `export` before `function f` in that file |
 | there is no `import X;` in this file | add `import X;` at the top (each file lists its own imports) |
 | `import X: there is no file X.pn in the project folder` | import paths start at the main file's folder: `import dir/file;` |
-| `may only contain functions and imports` | move top-level code from the imported file into a function or the main file |
+| `may only contain functions, classes and imports` | move top-level code from the imported file into a function or the main file |
 | `import cycle: a.pn -> b.pn -> a.pn` | move what both need into a third file that both import |
 | `is not in pin.lock. Run: pin get ...` | run that `pin get` with a version, e.g. `@v1.0.0` |
 | `does not match pin.lock` | delete the package's cache folder named in the message; never just re-run `pin get` |

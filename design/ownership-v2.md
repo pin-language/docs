@@ -1,9 +1,13 @@
 # Pin — Ownership v2: `list<string>`, nested containers, classes
 
-**Status (Pin 0.4, 2026-10-25):** partly built. `list<string>` (with owned strings) and per-path checking
-(every `if` branch and loop checked on its own, definite assignment) are in. Classes, borrowing from an
-index (R2), `&` parameters (R4), `foreach ... as &$v` (R5), methods (R6) and nested containers are **not built
-yet**. Agreed with the owner on 2026-10-24.
+**Status (Pin 0.5, 2026-10-25):** **built**, R1–R7 and nested containers, with these differences:
+- R2 borrows lists, maps and objects; strings read from a container are still copied (D4 not built).
+- "Last use" is approximated in evaluation order (plus loop rounds), so a few safe programs are rejected —
+  never an unsafe one. The message names the line of the later use.
+- R4 `&` works on variables and paths; not on bool items inside containers. `&$this` is not allowed (it
+  would let a callee replace the object a method is running on); `&$this->prop` is.
+- The call's other arguments may not use a value lent with `&`, nor the receiver of a changing method.
+- A class cannot hold itself directly (no null yet): use `list<Node>` or an id.
 
 ## Decision rule (chosen by the owner)
 

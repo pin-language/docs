@@ -37,7 +37,7 @@ echo double("4");
 Error:
 
 ```text
-example.pn:2: error: argument of double(): expected int but got string
+example.pn:2: error: argument $n of double(): expected int but got string
 ```
 
 ## Every path must return

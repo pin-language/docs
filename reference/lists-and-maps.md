@@ -6,7 +6,7 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 |---|---|
 | [`count`](#count) | Number of items in a list or entries in a map. |
 | [`fill`](#fill) | A new list with `$n` copies of `$value`. |
-| [`copy`](#copy) | An independent copy you own. |
+| [`copy`](#copy) | An independent copy you own, with everything inside it. |
 | [`sort`](#sort) | Sort a list variable in place, smallest first. |
 | [`rsort`](#rsort) | Sort a list variable in place, largest first. |
 | [`isset`](#isset) | Whether a list index is in range or a map key exists. |
@@ -57,26 +57,30 @@ Output:
 ## copy
 
 ```php
-copy(list|map|string $x): same type
+copy(list|map|object|string $x): same type
 ```
 
-An independent copy you own.
+An independent copy you own, with everything inside it.
 
 ```php
 $a = [1, 2];
 $b = copy($a);
 $b[] = 3;
-echo count($a), " ", count($b), "\n";
+$grid = [[1], [2]];
+$g2 = copy($grid);
+$g2[0][] = 9;
+echo count($a), " ", count($b), " ", json_encode($grid), " ", json_encode($g2), "\n";
 ```
 
 Output:
 
 ```
-2 3
+2 3 [[1],[2]] [[1,9],[2]]
 ```
 
-- Lists and maps move on `$b = $a`; use `copy()` when you need two of them.
-- A function parameter is read-only; `copy()` it before changing it.
+- Lists, maps and objects move on `$b = $a`; use `copy()` when you need two of them.
+- A function parameter is read-only; `copy()` it before changing it (or declare it `&`).
+- Copies deeply: nested lists, maps and objects are copied too. A value holding a `db` or `rows` cannot be copied.
 
 ## sort
 

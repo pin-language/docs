@@ -2,6 +2,7 @@
 
 **Status (Pin 0.4, 2026-10-25):** **not built yet.** Today `null` and `?Type` are compile errors that say so;
 code uses defaults such as `-1`, `""` or `$m[$k] ?? $default` instead. Agreed with the owner on 2026-10-24.
+N5 (every property set when the constructor ends, no `$this` use before that) is built in 0.5 with classes.
 
 Decision rule: memory safety > speed > clarity > looking like PHP.
 

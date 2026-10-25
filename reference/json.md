@@ -14,23 +14,29 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 ## json_encode
 
 ```php
-json_encode(int|float|bool|string|list|map $x): string
+json_encode(int|float|bool|string|list|map|object $x): string
 ```
 
 JSON text for a value.
 
 ```php
+class Line {
+    public function __construct(public string $item, public int $qty, private int $cost) {}
+}
 echo json_encode(["name" => "ไทย", "note" => "a\"b"]), " ", json_encode([1.5, 2.0]), " ", json_encode("x"), "\n";
+echo json_encode([new Line("tea", 2, 80)]), " ", json_encode([[1, 2], [3]]), "\n";
 ```
 
 Output:
 
 ```
 {"name":"ไทย","note":"a\"b"} [1.5,2.0] "x"
+[{"item":"tea","qty":2}] [[1,2],[3]]
 ```
 
 - UTF-8 text is kept as is (like `JSON_UNESCAPED_UNICODE`); whole floats keep `.0`.
-- A map has one value type; build mixed objects as strings: `"{\"id\":" . $id . ",\"name\":" . json_encode($name) . "}"`.
+- Objects become JSON objects of their public properties, in declaration order; private properties are left out.
+- A map has one value type; for a JSON object with mixed values, use a class.
 - **PHP:** PHP escapes non-ASCII as `\uXXXX` and drops `.0` unless `JSON_PRESERVE_ZERO_FRACTION` is set.
 
 ## json_has

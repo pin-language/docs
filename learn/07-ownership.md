@@ -92,7 +92,7 @@ function add_fee(list<int> $xs): list<int> {
 Error:
 
 ```text
-example.pn:2: error: $xs is a parameter lent to this code, so it cannot be changed. Work on a copy instead: $copy = copy($xs);
+example.pn:2: error: $xs is a parameter lent to this function read-only, so it cannot be appended to. To change the caller's value declare it as list<int> &$xs (and call with &$value); or work on $copy = copy($xs);
 ```
 
 Copy it, change the copy, return the copy — the caller becomes the owner of what you return:
@@ -116,6 +116,24 @@ Output:
 
 (In PHP the function would silently change its own copy. Pin makes the copy visible, so you always know
 when memory is duplicated.)
+
+To change the caller's list in place, without a copy, declare the parameter with `&` and write `&` at
+the call as well, so that whoever reads the call can see the change coming:
+
+```php
+function add_fee(list<int> &$xs): void {
+    $xs[] = 10;
+}
+$prices = [55, 40];
+add_fee(&$prices);
+echo json_encode($prices), "\n";
+```
+
+Output:
+
+```text
+[55,40,10]
+```
 
 ## 4. No changes while foreach walks
 

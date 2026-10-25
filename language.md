@@ -1,6 +1,6 @@
-# The Pin language guide (0.4)
+# The Pin language guide (0.5)
 
-Pin reads like PHP 8 and compiles to a native binary. This guide covers everything the 0.4 compiler
+Pin reads like PHP 8 and compiles to a native binary. This guide covers everything the 0.5 compiler
 accepts. Anything not listed here is not supported yet.
 
 ## Files and running
@@ -23,8 +23,10 @@ pin check hello.pn        # errors only
 | `float` | `1.5`, `2.0e10` | 64-bit IEEE |
 | `bool` | `true`, `false` | |
 | `string` | `"hi $name"`, `'raw'` | bytes; Thai/UTF-8 text is kept as is |
-| `list<T>` | `[1, 2, 3]`, `["a", "b"]` | `T` is `int`, `float`, `bool` or `string` |
-| `map<K,V>` | `["a" => 1]` | `K` is `int` or `string`; `V` is `int`, `float`, `bool` or `string`; keeps insertion order |
+| `list<T>` | `[1, 2, 3]`, `["a", "b"]`, `[[1], [2, 3]]` | `T` is any type except `db`, `rows`, `void` |
+| `map<K,V>` | `["a" => 1]` | `K` is `int` or `string`; `V` any type except `db`, `rows`, `void`; keeps insertion order |
+| a class | `new Order(1)` | see [Classes](#classes) |
+| `db`, `rows` | `db_open("app.db")` | see [Database](#database-sqlite) |
 | `void` | | return type only |
 
 A variable gets its type from its first assignment and keeps it. Empty containers need the type
@@ -82,6 +84,17 @@ function log_line(string $s): void { echo $s, "\n"; }
 Parameter and return types are required. Recursion works. There are no default values, no named
 arguments and no variadics yet.
 
+A parameter declared with `&` may change the caller's value; the call writes `&` too:
+
+<!-- check: skip -->
+```php
+function add_tax(int &$satang): void { $satang = intdiv($satang * 107, 100); }
+add_tax(&$price);
+```
+
+The argument must be a variable or a path into one (`&$orders[0]`, `&$o->items`), and the other arguments of
+the same call may not use it.
+
 ## Lists and maps
 
 ```php
@@ -100,26 +113,26 @@ echo array_key_exists("tea", $price);
 echo json_encode($price);  // {"cake":89}
 ```
 
-A map has one value type, so a JSON object with mixed values is built as a string — `json_encode()`
-of a string gives a quoted, escaped JSON string:
+Containers nest: `list<list<int>>`, `map<string,list<string>>`, `list<Order>`. Change inner values through
+the path: `$grid[1][] = 4;`, `$m["a"]["b"] += 1;` (a missing key on the way panics; a missing key at the end
+is created). A map has one value type; for a JSON object with mixed values use a class and `json_encode()`.
 
-<!-- check: skip -->
-```php
-return "{\"item\":" . json_encode($name) . ",\"qty\":" . $qty . "}";
-```
+`foreach ($xs as &$x) { $x += 1; }` changes the items in place (not for bools). The `&` variable exists only
+inside its loop.
 
 ## Ownership
 
-Lists, maps and strings live on the heap. Pin frees them without a garbage collector by following
+Lists, maps, strings and objects live on the heap. Pin frees them without a garbage collector by following
 these rules, all checked when you compile:
 
 1. Each value has one owner (a variable). It is freed when the owner's function returns or the
    variable gets a new value.
-2. `$b = $a;` **moves** a list or map: `$b` is the owner and `$a` cannot be used any more (until you
+2. `$b = $a;` **moves** a list, map or object: `$b` is the owner and `$a` cannot be used any more (until you
    assign it again). Use `copy($a)` for a second, independent value.
 3. Strings **copy** on assignment, like PHP. String literals are never copied.
 4. Passing a value to a function **lends** it read-only. The function cannot change it, move it or
-   return it as is; the caller still owns it afterwards. To change it, make a copy inside.
+   return it as is; the caller still owns it afterwards. To change it, make a copy inside, or declare the
+   parameter `&` (it may then change, but still not move, the caller's value).
 5. `foreach` variables are loans too.
 6. While `foreach` walks over a list or map, you cannot add to it, remove from it or replace it.
 7. A function that returns a list or map hands ownership to the caller.
@@ -127,6 +140,43 @@ these rules, all checked when you compile:
    loop, `copy()` it, or `break` right after moving.
 9. Each `if` branch is checked on its own: moving `$a` in one branch leaves it usable in the other.
    After the `if`, `$a` counts as moved if any branch that continues moved it.
+10. Reading a list, map or object out of a container or property borrows it: `$u = $users[0];` makes `$u`
+    a read-only view, no copy. While `$u` is used again later in the function, `$users` cannot change.
+    `copy($users[0])` gives a value of your own. A borrowed value cannot be moved, stored or returned.
+11. A list, map or object inside another value cannot be moved out of it (`$all[] = $o->items;` is an
+    error): copy it.
+
+## Classes
+
+<!-- check: skip -->
+```php
+class Order {
+    public int $id;
+    public list<string> $items = [];       // a default must be a literal
+    private int $discount = 0;
+    function __construct(int $id) { $this->id = $id; }
+    function add(string $item): void { $this->items[] = $item; }
+    function count(): int { return count($this->items); }
+}
+class Point { public function __construct(public int $x, public int $y) {} }   // promoted properties
+$o = new Order(7);
+$o->add("tea");
+echo json_encode($o);                       // {"id":7,"items":["tea"]} — public properties, in order
+```
+
+- Every property has a value when the constructor ends, on every path: a default, or set in `__construct`
+  (checked when compiling). Before that, `__construct` cannot read an unset property or use `$this` otherwise.
+  A class without `__construct` needs a default for every property.
+- `public` / `private` on properties (required) and methods (default `public`). Private members are for the
+  class's own methods; `json_encode` leaves private properties out.
+- Objects are values with one owner: they move on `=`, `copy()` copies deeply, parameters are read-only loans.
+- A method that assigns to `$this->...` or calls such a method is a *changing method* (inferred). It can be
+  called on owned variables, `&` parameters, `&` foreach variables and paths into them — not on read-only
+  loans.
+- Classes in modules: `export class Name`, used as `module::Name` in types and `new module::Name(...)`.
+- Strings interpolate `"$o->name"` and `"{$o->items[0]->name}"`.
+- Not supported: `extends`, interfaces, traits, `abstract`, `static`, `protected`, class constants,
+  `readonly`, `==` on objects, and a class holding itself directly (use `list<Node>` or an id).
 
 There are no global variables. Functions only see their parameters.
 
@@ -184,8 +234,8 @@ serve(8080, "handle");
 Each `.pn` file is a module. `import prices;` loads `prices.pn` from the project folder (the main file's
 folder; inside a package, the package's root), whichever file contains the import (`import util/text;` loads
 `util/text.pn`; `import util/text as t;` renames it); call its functions as
-`prices::price(...)`. Only functions marked `export` can be called from other files. Imported files may
-contain only functions and imports (no top-level code), and imports may not form a circle. All files compile
+`prices::price(...)`. Only functions and classes marked `export` can be used from other files. Imported files
+may contain only functions, classes and imports (no top-level code), and imports may not form a circle. All files compile
 into one binary.
 
 Packages are Git repositories: `pin get github.com/owner/repo@v1.0.0` writes the commit and a SHA-256 of the
@@ -207,7 +257,7 @@ SQLite's development files (`sudo apt install libsqlite3-dev`).
 
 ## Not in Pin yet
 
-Classes and objects, `null` and `?Type`, `try`/`catch`/`throws`, lists of lists, maps of lists or maps,
+Inheritance and interfaces, `null` and `?Type`, `try`/`catch`/`throws`, default parameter values,
 closures, sorting with a custom comparison, a full `json_decode`
 (nested objects and arrays), request headers, databases other than SQLite (PostgreSQL is next), `go`/`await`. Designs for most of these are in
 [`design/`](design/).

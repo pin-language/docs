@@ -1,6 +1,6 @@
 # 12. Modules and packages
 
-[Learn Pin](README.md) · previous: [11. A database](11-database.md)
+[Learn Pin](README.md) · previous: [11. A database](11-database.md) · next: [13. Classes](13-classes.md)
 
 When a program grows, split it into files. Each `.pn` file is a **module**; `import` loads one, and you call
 its functions as `module::function()`. Everything still compiles into one native binary.
