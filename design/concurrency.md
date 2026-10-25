@@ -1,6 +1,6 @@
 # Pin — Concurrency
 
-**Status (Pin 0.4, 2026-10-25):** **not built yet.** Today the only parallelism is the HTTP server, which runs
+**Status (Pin 0.5, 2026-10-25):** **not built yet.** Today the only parallelism is the HTTP server, which runs
 one handler per CPU core with no shared state. Agreed with the owner on 2026-10-24, replacing the earlier
 decision 3A (Go-style goroutines) with **structured `go` + `await`**. Prerequisites already built: the macOS
 event loop (kqueue), per-path analysis (`class Flow`), panic → 500 with per-request cleanup. Still needed
@@ -71,6 +71,45 @@ No `timeout` keyword — a function keeps the syntax small.
 There are no separate "async" functions: every function can use `go`, and every function can be started with
 `go`.
 
+### C9 — Hub: messages between requests (decided 2026-10-25, owner: "you decide")
+Requests share nothing, so they talk through a runtime-owned **Hub** of named topics. A message is a string
+(usually `json_encode` of an object) and is **copied** into the hub: no memory is shared, the "no globals"
+rule stays.
+```php
+hub_publish("inbox:$agent", json_encode($msg));        // wakes every waiting subscriber
+$inbox = hub_subscribe("inbox:$agent");                 // owned; closed when it goes out of scope
+$m = try await_timeout($inbox->next(), 25000);          // waits without holding an OS thread
+```
+- In memory only (lost on restart). Programs that must not lose messages store them (SQLite) and use the hub
+  only to wake the reader.
+- Each topic keeps the last 100 messages with increasing ids, so a reader that reconnects can ask for what it
+  missed (`hub_since($topic, $lastId)`).
+- A slow subscriber whose queue is full is closed (bounded memory), not allowed to grow without limit.
+
+### C10 — long-lived responses: `route()` and `Stream` (SSE first)
+- `route($method, $path, "fn")` + `serve($port)` next to today's single handler. A route function may take
+  `Stream &$out` to send many chunks (Server-Sent Events); `$out->send()` throws when the client is gone, so
+  the function ends and ownership cleans up its subscription and connections.
+- Order: SSE and long-poll first; WebSocket later.
+- Client side for "tunnels" (an agent's runner keeps one outgoing connection open): `http_stream($url)` and
+  `$pipe->next()`.
+
+### C11 — when a stream closes (defaults)
+| who | when |
+|---|---|
+| server | permission revoked (at once) · token expired · the same client connects again (close the older) · subscriber queue full · open longer than 1 hour (rotate) · shutting down (tell clients to reconnect) |
+| client | stopping (say goodbye) · nothing received for 60 s (server pings every 25 s) |
+Reconnects use `Last-Event-ID` so nothing is missed, with backoff 1, 2, 4, 8 … 30 s. These numbers are
+starting values, not measured.
+
+### Ideas kept for later (not decided)
+- **Durable `await`**: Pin values are trees (one owner, no cycles — R7), so a waiting task's state could be
+  saved and resumed after a restart. To research before claiming it is new.
+- Deterministic scheduling with a seed, so concurrency bugs replay exactly.
+- Every wait must have a timeout (compile-time rule) — would rule out hanging forever.
+- Cancel a handler's work when its client disconnects.
+- Hub across machines (bridge to NATS / Redis).
+
 ## Examples
 
 ```php
@@ -124,7 +163,7 @@ user.pn:5: error: findUser() can fail, so write try await $t
 
 ## Implementation order
 
-Needs first: `throws` / `try`.
+Needs first: `throws` / `try`, then request headers + timeouts (owner, 2026-10-25).
 1. Runtime: green threads, stacks with guard pages, a scheduler per core.
 2. Tie the server's I/O into the scheduler.
 3. Compiler: `go` / `await` / `Task<T>` and C1–C3.
