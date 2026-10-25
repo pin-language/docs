@@ -50,4 +50,4 @@ New to Pin? Start with the [language guide](../language.md). Writing Pin with an
 
 ## [Security (hashes, passwords, random)](security.md)
 
-[`hash`](security.md#hash), [`hash_hmac`](security.md#hash_hmac), [`hash_equals`](security.md#hash_equals), [`random_token`](security.md#random_token), [`random_int`](security.md#random_int), [`password_hash`](security.md#password_hash), [`password_verify`](security.md#password_verify)
+[`env`](security.md#env), [`hash`](security.md#hash), [`hash_hmac`](security.md#hash_hmac), [`hash_equals`](security.md#hash_equals), [`random_token`](security.md#random_token), [`random_int`](security.md#random_int), [`password_hash`](security.md#password_hash), [`password_verify`](security.md#password_verify)

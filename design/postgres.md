@@ -1,6 +1,7 @@
 # Pin — PostgreSQL (P4)
 
-**Status (2026-10-26):** design draft, **nothing built**. Prerequisite P4 for the web framework
+**Status (2026-10-26):** design draft. **Built:** G6 (SQL variables built from literals, for SQLite now) and
+`env()` (G7's built-in; the compile error for `postgres://` literals comes with PostgreSQL). Not built: G1–G5. Prerequisite P4 for the web framework
 ([tack.md](tack.md)); builds on the connection pool ([pool.md](pool.md)). Decisions are made by the rule;
 open questions for the owner are at the end. Checked on the owner's Mac: PostgreSQL 16.14 and libpq are
 installed (Homebrew), so this can be built and tested locally.

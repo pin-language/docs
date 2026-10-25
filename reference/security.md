@@ -4,6 +4,7 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 
 | | |
 |---|---|
+| [`env`](#env) | An environment variable, or `""` when it is not set. |
 | [`hash`](#hash) | SHA-256 of a string, as 64 lowercase hex characters. |
 | [`hash_hmac`](#hash_hmac) | HMAC-SHA256 of `$data` with `$key`, as hex: a signature only someone with the key can make. |
 | [`hash_equals`](#hash_equals) | Compare two strings in a time that does not depend on where they differ. |
@@ -11,6 +12,28 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`random_int`](#random_int) | A random integer from `$min` to `$max` (both included), from the operating system's secure source. |
 | [`password_hash`](#password_hash) | A salted, slow hash of a password, to store instead of the password. |
 | [`password_verify`](#password_verify) | Whether `$password` matches a hash made by `password_hash()`. |
+
+## env
+
+```php
+env(string $name): string
+```
+
+An environment variable, or `""` when it is not set.
+
+```php
+echo env("PIN_SURELY_NOT_SET") == "" ? "not set\n" : "set\n";
+```
+
+Output:
+
+```
+not set
+```
+
+- Read secrets from here (database URLs, API keys, signing keys), never from string literals: literals end up in git and in the binary.
+- Read once per request is fine (it is cheap); a name containing a zero byte gives `""`.
+- **PHP:** `getenv('NAME')`, but `""` instead of `false` when unset.
 
 ## hash
 
