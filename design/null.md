@@ -1,72 +1,76 @@
 # Pin — Null
 
-สถานะ: **ร่าง ยังไม่ implement** (2026-10-24) · owner ตกลงตามที่เสนอ · หลักการ: safety > ความเร็ว > อ่านง่าย > เหมือน PHP
+**Status (Pin 0.4, 2026-10-25):** **not built yet.** Today `null` and `?Type` are compile errors that say so;
+code uses defaults such as `-1`, `""` or `$m[$k] ?? $default` instead. Agreed with the owner on 2026-10-24.
 
-## กติกา
+Decision rule: memory safety > speed > clarity > looking like PHP.
 
-### N1 — ไม่เป็น null โดย default
-ทุก type ห้ามเป็น null เว้นแต่เขียน `?` นำหน้า: `?User`, `?int`, `?string`, `?list<int>`
+## Rules
+
+### N1 — nothing is null unless its type says so
+No type may be null unless written with a leading `?`: `?User`, `?int`, `?string`, `?list<int>`.
 ```php
 function findUser(int $id): ?User { ... }
-function name(User $u): string { ... }      // $u ไม่มีวันเป็น null
+function name(User $u): string { ... }      // $u is never null
 ```
-`null` ใส่ได้เฉพาะตัวแปร/parameter/return/property ที่เป็น `?T`
+`null` can only go into a variable, parameter, return value or property of a `?T` type.
 
-### N2 — ต้องเช็คก่อนใช้ compiler รู้เอง (flow typing)
+### N2 — check before use; the compiler follows the check (flow typing)
 ```php
 $u = findUser($id);
 echo $u->name;                  // error
-if ($u !== null) { echo $u->name; }        // ได้
+if ($u !== null) { echo $u->name; }        // fine
 if ($u === null) { return "{}"; }
-echo $u->name;                  // ได้
+echo $u->name;                  // fine
 ```
-- รูปที่ compiler รู้: `!== null`, `=== null` + return/throw/break/continue, `isset($u)`, `&&` / `||`
-- ถ้า `$u` ถูก assign ใหม่หลังเช็ค ต้องเช็คใหม่
-- property `$u->x` ที่เป็น `?T` เช็คแล้วรู้ได้เฉพาะเมื่อ `$u` ไม่ถูกแก้/ส่ง `&` ระหว่างนั้น
-- ใช้ control-flow analysis ร่วมกับ B3, ownership-v2 R2, error-handling E-R4
+- Forms the compiler understands: `!== null`, `=== null` followed by return/throw/break/continue,
+  `isset($u)`, `&&` / `||`.
+- Assigning `$u` again after the check means checking again.
+- A `?T` property `$u->x` stays narrowed only while `$u` is not changed or lent with `&` in between.
+- Uses the same per-path analysis (`class Flow`) as the ownership checks.
 
-### N3 — syntax PHP 8
+### N3 — PHP 8 syntax
 ```php
 $name = $u?->name;                                   // ?string
 $name = $u?->name ?? "guest";                        // string
-$len  = $u?->getName()?->length();                   // ต่อกันได้
+$len  = $u?->getName()?->length();                   // chains
 $u = findUser($id) ?? throw error(404, "not found"); // User
 ```
 
-### N4 — ไม่มี force-unwrap (`!` / `!!`)
-ใช้ `?? throw error(...)` แทน — เห็นชัดว่า null แล้วเกิดอะไร
+### N4 — no force-unwrap (`!` / `!!`)
+Use `?? throw error(...)` instead: it shows what happens when the value is null.
 
-### N5 — property ต้องมีค่าครบหลัง constructor (compile time)
+### N5 — every property has a value when the constructor ends (checked at compile time)
 ```php
 class User {
     public int $id;
     public string $name;
-    public ?string $email;           // ?T ได้ค่า null อัตโนมัติถ้าไม่ได้กำหนด
+    public ?string $email;           // a ?T property starts as null if not set
     function __construct(int $id, string $name) { $this->id = $id; }
 }
 // error: User::__construct() does not set $this->name on every path
 ```
-ห้ามเรียก method ของ `$this` ใน constructor ก่อนกำหนด property ครบ
+A constructor may not call `$this` methods before every property is set.
 
-### N6 — layout (ความเร็ว)
-| type | เก็บยังไง | ค่าใช้จ่าย |
+### N6 — layout (speed)
+| type | stored as | cost |
 |---|---|---|
-| `?User`, `?string`, `?list<T>`, `?map<K,V>` | pointer, null = 0 | ไม่มี |
-| `?int`, `?float`, `?bool` ในตัวแปร/arg/return | `{i64, i1}` ส่งผ่าน 2 register | น้อยมาก |
-| `list<?int>` ฯลฯ | ข้อมูลเดิม + bitmap แยก 1 bit/ช่อง | หน่วยความจำ +1.6% |
-| `map<K, ?V>` | ใช้ bit ใน entry ที่มีอยู่ | ไม่มี |
+| `?User`, `?string`, `?list<T>`, `?map<K,V>` | a pointer; null = 0 | none |
+| `?int`, `?float`, `?bool` in variables, arguments, returns | `{i64, i1}` in two registers | tiny |
+| `list<?int>` and similar | the data plus a separate bitmap, 1 bit per item | +1.6% memory |
+| `map<K, ?V>` | a bit in the existing entry | none |
 
-### N7 — `?T` หรือ `throws`
-- **ไม่เจอเป็นเรื่องปกติ** → `?T` (หา user, header ที่ไม่บังคับ, field ที่ไม่บังคับใน JSON)
-- **ล้มเหลวและมีเหตุผล** → `throws` (JSON ผิดรูป, database ล่ม, input ไม่ผ่าน)
-- `$m[$k]` key ไม่มี → panic เหมือนเดิม · `$m[$k] ?? x` ใช้ได้เหมือนเดิม
+### N7 — `?T` or `throws`?
+- **Not found is normal** → `?T` (looking up a user, an optional header, an optional JSON field).
+- **A failure with a reason** → `throws` (malformed JSON, database down, invalid input).
+- A missing key in `$m[$k]` still panics; `$m[$k] ?? $x` keeps working.
 
 ### N8 — `json_encode`
-`null` → `null` · property ที่เป็น null ใส่ใน output (`"email":null`) เหมือน PHP
+`null` → `null`; null properties appear in the output (`"email":null`), like PHP.
 
-## ตัวอย่าง error message
+## Example error messages
 ```
-users.pn:8: error: $u may be null (findUser() returns ?User). Check it with if ($u !== null), or use $u?->name / ?? 
+users.pn:8: error: $u may be null (findUser() returns ?User). Check it with if ($u !== null), or use $u?->name / ??
 users.pn:3: error: cannot pass null to name(): parameter $u is User, not ?User
 users.pn:12: error: User::__construct() does not set $this->name on every path
 users.pn:20: error: $u was checked on line 15 but assigned again on line 18. Check it again before using it

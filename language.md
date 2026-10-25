@@ -209,5 +209,5 @@ SQLite's development files (`sudo apt install libsqlite3-dev`).
 
 Classes and objects, `null` and `?Type`, `try`/`catch`/`throws`, lists of lists, maps of lists or maps,
 closures, sorting with a custom comparison, a full `json_decode`
-(nested objects and arrays), request headers, databases other than SQLite (PostgreSQL is next), `go`/`await`. Designs for most of these (Thai) are in
+(nested objects and arrays), request headers, databases other than SQLite (PostgreSQL is next), `go`/`await`. Designs for most of these are in
 [`design/`](design/).

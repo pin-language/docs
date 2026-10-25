@@ -1,83 +1,94 @@
-# Pin — Ownership v2: `list<string>`, container ซ้อน, class
+# Pin — Ownership v2: `list<string>`, nested containers, classes
 
-สถานะ: **ร่าง ยังไม่ implement** (2026-10-24)
+**Status (Pin 0.4, 2026-10-25):** partly built. `list<string>` (with owned strings) and per-path checking
+(every `if` branch and loop checked on its own, definite assignment) are in. Classes, borrowing from an
+index (R2), `&` parameters (R4), `foreach ... as &$v` (R5), methods (R6) and nested containers are **not built
+yet**. Agreed with the owner on 2026-10-24.
 
-## หลักการตัดสินใจ (owner เลือก)
+## Decision rule (chosen by the owner)
 
-เรียงตามลำดับความสำคัญ:
+In order of priority:
 
-1. **memory safety** — ห้ามมี use-after-free, double free, อ่าน/เขียนนอกขอบ **owner ยืนยันแล้ว (2026-10-24): อยู่เหนือความเร็ว bounds check ต้องอยู่ตลอด ไม่มี `unsafe` ไม่มี flag ปิด check** ทางทำให้เร็วคือให้ compiler/LLVM พิสูจน์แล้วตัด check ที่ซ้ำออกเอง
-2. **ความเร็วตอนรัน** — ไม่มีค่าใช้จ่ายที่ซ่อนอยู่ ไม่มี GC ไม่มี refcount ไม่มี copy ที่ไม่ได้สั่ง
-3. ความชัดของโค้ด — อ่านแล้วเห็นว่าตรงไหนแก้ข้อมูล ตรงไหน copy
-4. **ความเหมือน PHP — สำคัญน้อยที่สุด** ใช้ syntax PHP ได้เมื่อไม่ขัดกับข้อ 1–3
+1. **Memory safety** — no use-after-free, double free, or out-of-bounds reads and writes. Confirmed by the
+   owner: it comes before speed. Bounds checks are always on: no `unsafe`, no flag to turn them off. Speed comes
+   from the compiler / LLVM proving checks redundant and removing them.
+2. **Speed at run time** — no hidden costs: no garbage collector, no reference counting, no copies nobody
+   asked for.
+3. **Clarity** — reading the code shows where data changes and where it is copied.
+4. **Looking like PHP — the lowest priority.** Use PHP syntax when it does not conflict with 1–3.
 
-## การตัดสินใจ
+## Decisions
 
-| # | เรื่อง | เลือก | เหตุผล |
+| # | question | chosen | why |
 |---|---|---|---|
-| D1 | object เป็น value หรือ handle | **value** มีเจ้าของคนเดียว ย้ายเมื่อ assign เหมือน list | ไม่มี refcount ตอนรัน |
-| D2 | `$u = $users[0];` | **ยืมแบบอ่านอย่างเดียว** ไม่ copy ไม่ error | เร็วที่สุด (เปลี่ยนจากที่แนะนำเดิมว่าให้ error — การยืมเร็วกว่าและใช้ง่ายกว่า) |
-| D3 | `&` ตอนเรียกฟังก์ชัน | **ต้องเขียนทั้งตอนประกาศและตอนเรียก** `discount(&$o)` | ไม่กระทบความเร็ว จึงเลือกที่อ่านชัดกว่า (ข้อ 3) แทนแบบ PHP (ข้อ 4) |
-| D4 | string อ่านจาก list/map | ใช้กติกาเดียวกับ D2: ยืม ไม่ copy | ไม่มี copy ซ่อน |
+| D1 | is an object a value or a handle? | **a value** with one owner; assignment moves it, like a list | no reference counting at run time |
+| D2 | `$u = $users[0];` | **a read-only borrow**: no copy, no error | fastest (an earlier proposal made it an error; borrowing is faster and easier to use) |
+| D3 | `&` at the call site | **written at both the declaration and the call**: `discount(&$o)` | no speed difference, so the clearer form (rule 3) wins over PHP's (rule 4) |
+| D4 | strings read from a list or map | the same as D2: borrowed, not copied | no hidden copies |
 
-## กติกา
+## Rules
 
-### R1 — ทุก heap value มีเจ้าของคนเดียว
-list, map, string, object เหมือนเดิม คืนหน่วยความจำเมื่อเจ้าของหมดอายุ
+### R1 — every heap value has exactly one owner
+Lists, maps, strings and objects as today; memory is freed when the owner goes away.
 ```php
-$b = $a;          // list / map / object: ย้าย ใช้ $a ต่อไม่ได้
-$t = $s;          // string: ยังเป็น copy เหมือนเดิม (กติกาเดิม ไม่เปลี่ยน)
+$b = $a;          // list / map / object: moves; $a can no longer be used
+$t = $s;          // string: still a copy (unchanged)
 ```
 
-### R2 — อ่านผ่าน index = ยืมในฟังก์ชันเดียว (ใหม่)
+### R2 — reading through an index borrows, within one function (new)
 ```php
-$u = $users[0];            // $u ยืม $users[0] แบบอ่านอย่างเดียว ไม่ copy
-echo $u->name;             // ได้
-$u->name = "x";            // error: $u ยืมมา แก้ไม่ได้
-$users[] = $new;           // error: $users ถูกยืมโดย $u (ยังใช้อยู่บรรทัด 7)
+$u = $users[0];            // $u borrows $users[0] read-only, no copy
+echo $u->name;             // fine
+$u->name = "x";            // error: $u is borrowed and cannot be changed
+$users[] = $new;           // error: $users is borrowed by $u (still used on line 7)
 echo $u->name;
 ```
-- การยืมอยู่ได้ **แค่ในฟังก์ชันเดียว** และจบเมื่อใช้ `$u` ครั้งสุดท้าย (แบบ non-lexical lifetime ของ Rust แต่ไม่ข้ามฟังก์ชัน)
-- ตัวแปรยืมเก็บลง list/map/field ไม่ได้ และ return ไม่ได้ → compiler ไม่ต้องมี lifetime annotation
-- ต้องการของตัวเอง: `copy($users[0])` ต้องการย้ายออก: `array_pop()`, `array_shift()`, `take($users, $i)`
+- A borrow lives **only inside one function** and ends at the last use of `$u` (like Rust's non-lexical
+  lifetimes, but never across functions).
+- A borrowed variable cannot be stored in a list, map or field, nor returned, so the compiler needs no
+  lifetime annotations.
+- To get your own value: `copy($users[0])`. To move it out: `array_pop()`, `array_shift()`, `take($users, $i)`.
 
-### R3 — แก้ผ่าน path ได้เลย
+### R3 — change through a path directly
 ```php
 $users[0]->name = "x";
-$m["a"]["b"] += 1;         // map ซ้อน map
-$order->items[] = "tea";   // list<string> ใน object
+$m["a"]["b"] += 1;         // a map of maps
+$order->items[] = "tea";   // a list<string> inside an object
 ```
 
-### R4 — `&` = ยืมแบบแก้ได้ ต้องเขียนทั้งสองฝั่ง
+### R4 — `&` is a borrow that may change, written on both sides
 ```php
 function discount(Order &$o): void { $o->total -= 10; }
 
-discount(&$order);         // ได้
-discount($order);          // error: ต้องเขียน &$order
-discount(&$orders[0]);     // ได้
-swap(&$a[0], &$a[1]);      // error: ยืม $a แบบแก้ได้ 2 ครั้งพร้อมกัน
+discount(&$order);         // fine
+discount($order);          // error: write &$order
+discount(&$orders[0]);     // fine
+swap(&$a[0], &$a[1]);      // error: $a borrowed for changing twice at once
 ```
-- ระหว่างยืมด้วย `&` ห้ามใช้ต้นทางทางอื่น (exclusive)
-- parameter ที่ไม่มี `&` ยังเป็นยืมอ่านอย่างเดียวเหมือนเดิม
+- While borrowed with `&`, the original cannot be used any other way (exclusive).
+- A parameter without `&` stays a read-only borrow, as today.
 
 ### R5 — foreach
 ```php
-foreach ($users as $u)  { echo $u->name; }    // ยืมอ่าน
-foreach ($users as &$u) { $u->age += 1; }     // ยืมแก้ได้ (ไม่มี copy)
+foreach ($users as $u)  { echo $u->name; }    // read-only borrow
+foreach ($users as &$u) { $u->age += 1; }     // a borrow that may change (no copy)
 ```
-ห้ามเพิ่ม/ลบของใน container ระหว่างวน (กติกาเดิม)
+Adding to or removing from the container while looping stays forbidden.
 
-### R6 — method
-- method ที่ assign `$this->...` หรือส่ง `$this` แบบ `&` ไปต่อ = **method แบบแก้ได้** compiler อนุมานเอง ไม่ต้องเขียน keyword
-- เรียก method แบบแก้ได้ต้องมีสิทธิ์แก้ receiver: ตัวแปรที่เป็นเจ้าของ, `&` param หรือ path ของมัน
+### R6 — methods
+- A method that assigns `$this->...` or passes `$this` on with `&` is a **changing method**; the compiler
+  infers it, no keyword needed.
+- Calling a changing method needs the right to change the receiver: an owned variable, a `&` parameter, or a
+  path into one.
 ```php
-function show(Order $o): void { $o->recalc(); }   // error: recalc() แก้ $o แต่ $o ยืมมาอ่านอย่างเดียว
+function show(Order $o): void { $o->recalc(); }   // error: recalc() changes $o, but $o is a read-only borrow
 ```
 
-### R7 — ไม่มี reference ที่ชี้กันไปมา
-object ชี้ parent ไม่ได้ ใช้ id/index แทน (`int $parentId`) ถ้าโค้ดจริงต้องใช้จริง ค่อยพิจารณา `shared class` แบบ refcount ทีหลัง — **ยังไม่ทำ**
+### R7 — no references pointing around
+An object cannot point at its parent; use an id or index (`int $parentId`). If real code ever needs shared
+objects, consider a reference-counted `shared class` later — **not planned now**.
 
-## ตัวอย่าง error message
+## Example error messages
 
 ```
 users.pn:7: error: cannot append to $users while $u is borrowing $users[0] (used again on line 8).
@@ -90,20 +101,18 @@ orders.pn:20: error: recalc() changes $o, but $o is a read-only parameter.
   Declare it as Order &$o, or work on copy($o)
 ```
 
-## ค่าใช้จ่ายของ implement (ประเมิน ยังไม่ได้วัด)
+## Implementation cost (estimated, not measured)
 
-- R2 ต้องมี liveness analysis ต่อฟังก์ชัน (หาว่าใช้ตัวแปรครั้งสุดท้ายบรรทัดไหน) งานใหม่ที่ใหญ่ที่สุดในสเปคนี้
-- R4/R6 เช็คได้ในฟังก์ชันเดียว เพราะไม่มี reference ถูกเก็บไว้
-- ควรแก้ B3 (move ไม่แยก branch) ไปพร้อม R2 เพราะใช้ control-flow analysis ชุดเดียวกัน
+- R2 needs per-function liveness (the line where each variable is used for the last time) — the largest new
+  piece. It builds on the per-path `Flow` state that 0.1 added (`class Flow` in pinac.py).
+- R4 and R6 can be checked within one function, because no reference is ever stored.
 
-## คำถามที่ยังเปิด
+## Decided
 
-ไม่มี
-
-## ตัดสินแล้ว
-
-- ~~concurrency (decision 3A)~~ → `go` + `await` แบบ structured ดู `concurrency.md` · `null.md` · `strings.md` (owner, 2026-10-24)
-- ~~int overflow (B4)~~ → panic เสมอ + `wrapping_*()` + เช็คขนาดใน runtime ทุกจุด ดู `int-overflow.md` (ตามกฎของ owner, 2026-10-24)
-- ~~ชื่อภาษา~~ → **Pin** นามสกุล `.pn` เหมือนเดิม (owner, 2026-10-24)
-- ~~error handling (decision 4)~~ → แบบ Swift/Zig (`throws` + `try` + `catch` compile เป็น return value) ดู `error-handling.md` (owner, 2026-10-24)
-- ~~memory safety อยู่เหนือความเร็วไหม?~~ → ใช่ bounds check อยู่ตลอด (owner, 2026-10-24)
+- Concurrency: structured `go` + `await` — see `concurrency.md` (owner, 2026-10-24; not built).
+- Int overflow: see `int-overflow.md` — memory-safety checks done; overflow panics on `+ - *` were built and
+  then removed for speed on the owner's request.
+- Name: **Pin**, extension `.pn` (owner, 2026-10-24).
+- Error handling: Swift/Zig style `throws` + `try` + `catch`, compiled to return values — see
+  `error-handling.md` (owner, 2026-10-24; not built).
+- Memory safety comes before speed; bounds checks always on (owner, 2026-10-24).

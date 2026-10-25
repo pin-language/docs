@@ -89,4 +89,4 @@ messages name the PHP feature and the replacement, so the agent can usually fix 
 - [Built-in reference](../reference/README.md) — every function with examples.
 - [Language guide](../language.md) — the complete rules.
 - [Examples](https://github.com/pin-language/pin/tree/HEAD/examples) — runnable programs.
-- [Design notes](../design/) (Thai) — classes, `null`, error handling and concurrency, as planned.
+- [Design notes](../design/) — classes, `null`, error handling and concurrency, as planned.

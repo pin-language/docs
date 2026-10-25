@@ -1,64 +1,79 @@
-# Pin — String และภาษาไทย
+# Pin — Strings and Thai text
 
-สถานะ: **ร่าง ยังไม่ implement** (2026-10-24) · owner ตกลงตามที่เสนอ · หลักการ: safety > ความเร็ว > อ่านง่าย > เหมือน PHP
+**Status (Pin 0.4, 2026-10-25):** **mostly not built yet.** Today strings are bytes like PHP: `strlen`,
+`substr` and `strpos` count bytes, and nothing validates UTF-8 or protects against cutting a character in half.
+Built since this design: `list<string>`, `explode`, `implode`, `sort` (0.2), and JSON output keeps UTF-8 as is.
+The rules below (UTF-8 invariant, character-aware functions, normalisation) are agreed with the owner
+(2026-10-24) but not implemented.
 
-## ข้อเท็จจริงที่เช็คแล้ว (Python unicodedata)
+Decision rule: memory safety > speed > clarity > looking like PHP.
 
-- `"ไทย"` = 3 ตัวอักษร = 9 byte
-- `"ที่"` = 3 code point (ท + ี + ่) = 9 byte แต่คนเห็นเป็น 1 ช่อง
-- `"ำ"` (U+0E33) มี compatibility decomposition เป็น U+0E4D U+0E32 → NFKC ทำให้สองแบบเท่ากัน, NFC ไม่ทำ
+## Facts (checked with Python's unicodedata)
 
-## กติกา
+- `"ไทย"` is 3 characters and 9 bytes.
+- `"ที่"` is 3 code points (ท + ี + ่) and 9 bytes, but people see one character cell.
+- `"ำ"` (U+0E33) has a compatibility decomposition to U+0E4D U+0E32, so NFKC makes the two spellings equal;
+  NFC does not.
 
-### ST1 — `string` เป็น UTF-8 ที่ถูกต้องเสมอ (invariant)
-- เช็คที่ขอบเท่านั้น: path/body ของ request, ไฟล์, database, `bytes_to_string()`
-- operation บน string ที่ถูกต้องให้ผลที่ถูกต้องเสมอ ไม่ต้องเช็คซ้ำ: `.`, `.=`, interpolation, `str_repeat`, `strtolower`, `trim`, `json_encode`, `substr` (ด้วย ST3)
-- เช็คด้วย SIMD (แบบ simdutf) ความเร็วระดับ GB/s
-- ปฏิเสธ overlong encoding, surrogate (U+D800–DFFF), ค่าเกิน U+10FFFF
-- request ที่ path หรือ body ไม่ใช่ UTF-8 ที่ถูกต้อง → server ตอบ 400 เอง ไม่เข้า handler (ยกเว้น handler ที่รับ `bytes` เมื่อมี ST2)
+## Rules
 
-### ST2 — `bytes` สำหรับข้อมูล binary (รอบหลัง)
-- ไฟล์ upload, รูป, hash, ข้อมูลเข้ารหัส
-- ใช้แทน `string` ไม่ได้ · `bytes_to_string(bytes $b): string throws` · `string_to_bytes()` ไม่มีวันล้มเหลว
-- ยังไม่ต้องทำในรอบแรก
+### ST1 — `string` is always valid UTF-8 (an invariant)
+- Checked only at the edges: request path and body, files, the database, `bytes_to_string()`.
+- Operations on valid strings give valid strings, so nothing is checked twice: `.`, `.=`, interpolation,
+  `str_repeat`, `strtolower`, `trim`, `json_encode`, `substr` (with ST3).
+- Validated with SIMD (like simdutf), at gigabytes per second.
+- Overlong encodings, surrogates (U+D800–DFFF) and values above U+10FFFF are rejected.
+- A request whose path or body is not valid UTF-8 gets a 400 from the server without reaching the handler
+  (except handlers that take `bytes`, once ST2 exists).
 
-### ST3 — `strlen` / `substr` / `strpos` เป็น byte, O(1)
-- ชื่อและความหมายเหมือน PHP (strpos ไม่เจอคืน -1 ตามกติกาเดิม)
-- `substr` ที่จุดเริ่มหรือจุดจบตกกลางตัวอักษร → **panic**
+### ST2 — `bytes` for binary data (later)
+- Uploaded files, images, hashes, encrypted data.
+- Cannot be used as a `string`: `bytes_to_string(bytes $b): string throws`; `string_to_bytes()` never fails.
+- Not needed in the first step.
+
+### ST3 — `strlen` / `substr` / `strpos` count bytes, O(1)
+- Same names and meaning as PHP (`strpos` returns -1 when not found, as now).
+- A `substr` whose start or end falls inside a character **panics**:
 ```
 text.pn:4: panic: substr() would cut a character in half at byte 4 of "ไทย".
   Use mb_substr() to count characters, or grapheme_substr() to count what people see
 ```
-- ตำแหน่งจาก `strpos` / `str_*` ไม่มีวันตกกลางตัวอักษร (needle เป็น UTF-8 ที่ถูกต้อง) → `substr($s, strpos($s, $x))` ไม่มีวัน panic
+- Positions from `strpos` / `str_*` never fall inside a character (the needle is valid UTF-8), so
+  `substr($s, strpos($s, $x))` never panics.
 
-### ST4 — นับเป็นตัวอักษร: ชื่อ PHP ที่มีอยู่แล้ว
-| function | นับเป็น | `"ที่"` | ความเร็ว |
+### ST4 — counting characters: PHP's existing names
+| function | counts | `"ที่"` | speed |
 |---|---|---|---|
-| `strlen` | byte | 9 | O(1) |
-| `mb_strlen` / `mb_substr` / `mb_strpos` | code point | 3 | O(n) |
-| `grapheme_strlen` / `grapheme_substr` | ช่องที่คนเห็น (UAX #29) | 1 | O(n) |
+| `strlen` | bytes | 9 | O(1) |
+| `mb_strlen` / `mb_substr` / `mb_strpos` | code points | 3 | O(n) |
+| `grapheme_strlen` / `grapheme_substr` | what people see (UAX #29) | 1 | O(n) |
 
-- **ตัดข้อความไทยไปแสดงผล ใช้ `grapheme_substr`** (ไม่งั้นวรรณยุกต์/สระลอย)
-- string เก็บ flag "ASCII ล้วน" ไว้ (คำนวณตอนเช็ค ST1 หรือตอนสร้าง) → ถ้า ASCII ล้วน `mb_*` / `grapheme_*` เร็วเท่า `strlen`
-- layout เดิม `{len, cap, bytes}` + flag 1 bit (เก็บใน bit สูงของ `cap` หรือ field ใหม่ — ตัดสินตอน implement)
+- **To shorten Thai text for display, use `grapheme_substr`** (otherwise tone marks and vowels come loose).
+- Strings remember whether they are pure ASCII (computed during ST1 validation or when built), so `mb_*` and
+  `grapheme_*` are as fast as `strlen` on ASCII text.
+- Layout stays `{len, cap, bytes}` plus a 1-bit flag (in the high bit of `cap` or a new field — decide when
+  building it).
 
-### ST5 — ตัวพิมพ์
-- `strtolower` / `strtoupper` เปลี่ยนเฉพาะ A–Z (เหมือน PHP 8.2+) ไม่ขึ้นกับ locale
-- `mb_strtolower` / `mb_strtoupper` สำหรับ Unicode
-- ภาษาไทยไม่มีตัวพิมพ์ ไม่กระทบ
+### ST5 — letter case
+- `strtolower` / `strtoupper` change A–Z only (like PHP 8.2+), independent of locale (as now).
+- `mb_strtolower` / `mb_strtoupper` for Unicode.
+- Thai has no letter case, so it is unaffected.
 
-### ST6 — normalize: ไม่อัตโนมัติ มีให้เรียก
-- `normalizer_normalize(string $s, int $form): string` · `NFC`, `NFKC`
-- เอกสารต้องเขียนชัด: **username, email, key ที่ใช้ค้น/เทียบ → NFKC ก่อนเก็บและก่อนเทียบเสมอ** (กรณี "ำ" ปลอมชื่อได้)
+### ST6 — normalisation: not automatic, available
+- `normalizer_normalize(string $s, int $form): string` with `NFC` and `NFKC`.
+- The docs must say plainly: **usernames, emails and lookup keys → NFKC before storing and before comparing**
+  (the "ำ" case allows look-alike names).
 
-### ST7 — ยังไม่ทำ (ต้องใช้ ICU, ทำเป็น library ภายหลัง)
-- เรียงตามพจนานุกรมไทย (`<` เรียงตาม code point: สระหน้า เ แ โ ใ ไ ทำให้ลำดับผิด)
-- ตัดคำภาษาไทย (ไม่มีช่องว่างระหว่างคำ)
-- เลขไทย ๑๒๓ ใน `intval()` — ไม่รองรับ (ASCII เท่านั้นเหมือน PHP)
+### ST7 — not planned now (needs ICU; a library later)
+- Thai dictionary order (`<` compares code points; leading vowels เ แ โ ใ ไ put words in the wrong order).
+- Thai word breaking (no spaces between words).
+- Thai digits ๑๒๓ in `intval()` — not supported (ASCII only, like PHP).
 
-## งานที่ต้องทำใน runtime ตอน implement
+## Runtime work when this is built
 
-1. validator UTF-8 (เริ่มแบบ scalar ที่ถูกต้องก่อน แล้วค่อยเปลี่ยนเป็น SIMD พร้อม test ชุดเดียวกัน)
-2. เช็ค boundary ใน `pn_substr` (byte ที่ตำแหน่งนั้นต้องไม่ใช่ `10xxxxxx`)
-3. `mb_*` + `grapheme_*` (ตาราง Grapheme_Cluster_Break จาก Unicode — ฝังเฉพาะช่วงที่ต้องใช้ หรือทั้งตาราง ~ไม่กี่ KB)
-4. test: ไทย, emoji, combining mark, overlong (`C0 AF`), surrogate (`ED A0 80`), ตัดกลางตัวอักษร → panic
+1. A UTF-8 validator (a correct scalar one first, then SIMD with the same tests).
+2. A boundary check in `pn_substr` (the byte at the position must not be `10xxxxxx`).
+3. `mb_*` and `grapheme_*` (the Unicode Grapheme_Cluster_Break table — only the needed ranges, or the whole
+   table, a few KB).
+4. Tests: Thai, emoji, combining marks, overlong (`C0 AF`), surrogates (`ED A0 80`), cutting inside a
+   character → panic.

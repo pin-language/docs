@@ -1,52 +1,59 @@
-# Pin — Integer overflow (B4)
+# Pin — Integer overflow
 
-สถานะ (2026-10-24): **S1–S3 ทำแล้ว** (เช็คขนาดหน่วยความจำ, `intdiv(INT_MIN,-1)`, `(int)` ของ float) และ `wrapping_*()` มีแล้ว
-**O1 (panic เมื่อ `+ - *` ล้น) ทำแล้วแต่ถอดออกชั่วคราว** ตามที่ owner สั่ง เพราะทำให้ benchmark ตก (collatz +23%, sieve +10%) — ตอนนี้ `+ - *` วนรอบ 64-bit แบบมีพฤติกรรมชัดเจน (ไม่ใช่ undefined behavior) จะใส่กลับเมื่อทำ O3 (ตัด check ที่พิสูจน์ได้) จนค่าใช้จ่ายเล็กพอ
-ร่างเดิม: owner ให้ตัดสินตามกฎ safety > ความเร็ว > อ่านง่าย > เหมือน PHP
+**Status (Pin 0.4, 2026-10-25):**
+- **Built:** the memory-safety fixes S1–S3 (checked allocation sizes, `intdiv(PHP_INT_MIN, -1)` panics,
+  `(int)` of NAN/INF/huge floats panics) and `wrapping_add` / `wrapping_sub` / `wrapping_mul`.
+- **Built, then removed (O1):** panicking on `+ - *` overflow. It cost up to 23% on integer loops (collatz
+  +23%, sieve +10%), and the owner asked to cut what made benchmark scores drop. `+ - *` now wrap around in
+  64 bits — defined behaviour, not undefined behaviour. It comes back once check elision (O3) makes it cheap.
+- **Changed in 0.2:** `intval()` and `json_int()` of a number that does not fit **saturate** at
+  `PHP_INT_MAX` / `PHP_INT_MIN`, like PHP, instead of panicking — a number sent by a client should get a 400
+  from the handler's range check, not a 500.
 
-## การตัดสินใจ
+Decision rule: memory safety > speed > clarity > looking like PHP.
 
-| # | เรื่อง | เลือก |
+## Decisions
+
+| # | question | chosen |
 |---|---|---|
-| O1 | `+ - *` กับ int ล้น | **panic เสมอ** ทั้ง debug และ release (ไม่มี flag ปิด เหมือน bounds check) |
-| O2 | ต้องการวนรอบจริง (hash, checksum) | เขียนชัดๆ: `wrapping_add()`, `wrapping_sub()`, `wrapping_mul()` |
-| O3 | ลดค่าใช้จ่าย | compiler ตัด check ที่พิสูจน์ได้ว่าไม่ล้น + `array_sum()` ในตัว |
-| O4 | ขนาดหน่วยความจำใน runtime | เช็คการคูณ/บวกขนาดทุกจุดเสมอ (แยกจาก O1 — เป็น memory safety) |
+| O1 | int `+ - *` overflow | **panic** in every build, no flag to turn it off — *removed for now, see Status* |
+| O2 | wrapping on purpose (hashes, checksums) | say so: `wrapping_add()`, `wrapping_sub()`, `wrapping_mul()` (built) |
+| O3 | making checks cheap | remove checks the compiler can prove unnecessary; a built-in `array_sum()` |
+| O4 | allocation sizes in the runtime | every size multiplication/addition is checked, always (memory safety, separate from O1; built) |
 
-ตัดทิ้ง: วนรอบเงียบๆ (บั๊กเรื่องเงินเงียบ), แบบ Rust ที่ release วนรอบ (production เจอบั๊กเงียบ), กลายเป็น float แบบ PHP (ขัด invariant ข้อ 1 และช้า)
+Rejected: silent wrapping as the long-term answer (silent money bugs), Rust's "wrap in release" (production
+gets the silent bug), PHP's "become a float" (breaks one-type-per-variable and is slow).
 
-## ต้องแก้ก่อน ไม่ว่าเลือกแบบไหน (memory safety / DoS)
+## Memory-safety and DoS fixes (built in 0.1)
 
-พบจากการอ่านโค้ด ยังไม่ได้รันพิสูจน์ (runtime ยัง build บน Mac ไม่ได้)
+| # | problem | effect |
+|---|---|---|
+| S1 | `fill($n)` computed `cap * esize` unchecked: `n = 2^61` wrapped to a 1-byte buffer while the list claimed `n` items, so bounds checks passed and writes went past the buffer | **heap overflow** (ASAN-confirmed on the old runtime) |
+| S2 | the same unchecked size arithmetic in list growth, list copy and string growth | potential overflows |
+| S3 | `intdiv(PHP_INT_MIN, -1)` and `PHP_INT_MIN % -1` are undefined behaviour in LLVM and crash the process on x86 | **DoS**: one URL could take a server down |
 
-| # | ปัญหา | ที่ | ผล |
-|---|---|---|---|
-| S1 | `fill($n)` คำนวณ `cap * esize` โดยไม่เช็คล้น → จองได้ 1 byte แต่ `len = n` → bounds check ผ่าน → เขียนเลยขอบ | `runtime.c` `pn_list_fill` (บรรทัด ~48) | **heap overflow** |
-| S2 | การคูณขนาดแบบเดียวกันใน `pn_list_grow`, `pn_list_copy`, การขยาย string (`s->cap * 2`, `s->len + extra`) | `runtime.c` | ต้องตรวจทุกจุด |
-| S3 | `intdiv(PHP_INT_MIN, -1)` และ `PHP_INT_MIN % -1` เป็น undefined behavior ใน LLVM — x86 crash ทั้ง process | `pinac.py` `binary()` (บรรทัด ~1192) เช็คแค่หารศูนย์ | **DoS**: ส่งเลขนี้มาใน URL ทำ server ล่ม |
+Fixes: `checked_size()` (`__builtin_mul_overflow` / `__builtin_add_overflow`) at every size computation; `intdiv`
+checks `rv == -1 && lv == INT64_MIN` and panics; `%` by -1 divides by 1 instead, giving PHP's answer 0. Each
+has a test in `tests/panics/` or `tests/arith.pn` and runs clean under ASAN.
 
-แก้: S1/S2 ใช้ `__builtin_mul_overflow` / `__builtin_add_overflow` ทุกจุดที่คำนวณขนาด ล้น = panic · S3 เพิ่ม check `rv == -1 && lv == INT64_MIN` → panic สำหรับ `intdiv`; สำหรับ `%` ผลคือ 0 (ตรงกับคณิตศาสตร์) ไม่ต้อง panic
-ทุกข้อต้องมี test ใน `tests/panics/` และผ่าน ASAN
+## O1 — how it worked (when re-enabled)
 
-## O1 — ทำงานยังไง
-
-- codegen ใช้ `llvm.sadd.with.overflow.i64` / `ssub` / `smul` แล้ว branch ไป `@pn_overflow(line)` (มี `!prof` ว่าไม่น่าเกิด เหมือนที่ทำกับหารศูนย์)
-- `-$x` เมื่อ `$x == PHP_INT_MIN` ล้นด้วย → panic
-- `++` / `--` / `+=` / `-=` / `*=` ใช้กติกาเดียวกัน
-- `intval("99999999999999999999")` — ตามหลักเดียวกัน: panic ไม่ใช่ตัดเป็น MAX แบบ PHP *(ทางเลือก: ทำ `intval()` แบบ `throws` ให้ handler ตอบ 400 ได้ — ตัดสินพร้อม json_decode)*
-- ใน server: panic = ทิ้ง request ตอบ 500 (error-handling.md E-R6)
+- `llvm.sadd/ssub/smul.with.overflow.i64`, branching to a cold `@pn_overflow(line)`.
+- `-$x` with `$x == PHP_INT_MIN`, and `++ -- += -= *=`, follow the same rule.
+- In a server: a panic answers 500.
 
 ```
 orders.pn:14: panic: integer overflow in $price * $qty (9223372036854775807 * 2).
   Use wrapping_mul() if wrapping around is what you want
 ```
 
-## O3 — ลดค่าใช้จ่าย
+## O3 — making it cheap (to do)
 
-1. **ตัด check ที่พิสูจน์ได้** — เริ่มจากกรณีที่เจอบ่อยที่สุด: ตัวนับ loop `for ($i = A; $i < $n; $i++)` ที่ `$i` ไม่ถูกแก้ใน loop → `$i + 1 <= $n <= MAX` ไม่ล้น · LLVM ช่วยต่อได้เองบางส่วน
-2. **`array_sum(list<int>)`** — loop บวกเลขแบบ `$total += $x` คือจุดที่ check ทำให้ SIMD หาย ทำในตัวด้วยการบวกเป็นก้อนแล้วเช็คทีหลัง (เช่นบวกแบบ 128-bit ต่อก้อน) เร็วใกล้เดิมและยังปลอดภัย
-3. float ไม่เปลี่ยน (IEEE 754: ล้นเป็น INF ไม่ใช่ปัญหา memory)
+1. **Remove provable checks**, starting with loop counters: `for ($i = A; $i < $n; $i++)` where `$i` is not
+   changed in the body cannot overflow. LLVM proves some of this by itself.
+2. **`array_sum(list<int>)`**: `$total += $x` loops are where checks cost SIMD; add in blocks and check after
+   (for example with 128-bit partial sums).
+3. Floats are unchanged (IEEE 754 overflow gives INF, not a memory problem).
 
-## ต้องวัด (หลัง Task 1 build บน Mac ได้)
-
-รัน `bench/*.pn` และ `api/server.pn` แบบมี/ไม่มี check เทียบกัน — จุดเสี่ยงคาดว่า `listsum` (`$total += $x`) และ `collatz` (`3 * $n + 1`) ถ้าช้าลงเกินที่รับได้ค่อยทำ O3 เพิ่ม ไม่ใช่ถอย O1
+Measure with the CPU benchmarks (pin-language/benchmarks) with and without checks; the risky ones are
+`listsum` (`$total += $x`) and `collatz` (`3 * $n + 1`).

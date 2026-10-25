@@ -1,66 +1,80 @@
 # Pin — Concurrency
 
-สถานะ: **ร่าง ยังไม่ implement** (2026-10-24) · owner ตกลง · แก้ decision 3A เดิม (goroutine แบบ Go) เป็น **`go` + `await` แบบ structured** · หลักการ: safety > ความเร็ว > อ่านง่าย > เหมือน PHP
+**Status (Pin 0.4, 2026-10-25):** **not built yet.** Today the only parallelism is the HTTP server, which runs
+one handler per CPU core with no shared state. Agreed with the owner on 2026-10-24, replacing the earlier
+decision 3A (Go-style goroutines) with **structured `go` + `await`**. Prerequisites already built: the macOS
+event loop (kqueue), per-path analysis (`class Flow`), panic → 500 with per-request cleanup. Still needed
+first: `throws` / `try` (`error-handling.md`).
 
-## ทำไมแก้ 3A
+Decision rule: memory safety > speed > clarity > looking like PHP.
 
-`go` ที่ปล่อยทิ้งได้ (แบบภาษา Go): error/panic หายเงียบ, task ค้าง (leak), task อยู่นานกว่า request → ยืมข้อมูลไม่ได้ ต้อง copy ทุกอย่าง (ช้า). Structured ปิดทั้ง 3 ข้อ และทำให้ยืมข้อมูลข้าม thread ได้โดยไม่ copy
+## Why 3A changed
 
-## กติกา
+A fire-and-forget `go` (as in Go) loses errors and panics silently, leaks tasks that never finish, and lets a
+task outlive its request — so it cannot borrow the request's data and must copy everything (slow). Structured
+tasks fix all three and let tasks borrow data across threads without copying.
 
-### C1 — `go` คืน `Task<T>` และต้อง `await` ก่อนฟังก์ชันจบทุกเส้นทาง
+## Rules
+
+### C1 — `go` returns a `Task<T>` that must be awaited before the function ends, on every path
 ```php
-$u = go findUser($id);          // Task<?User> เริ่มทำงานทันที
-$user = try await $u;           // f() throws → ต้อง try await
-$n = await go count2($xs);      // f() ไม่ throws → await เฉยๆ
+$u = go findUser($id);          // a Task<?User>, already running
+$user = try await $u;           // f() throws → try await
+$n = await go count2($xs);      // f() does not throw → plain await
 ```
-- `Task<T>` เป็น value มีเจ้าของคนเดียว ย้ายได้ (เก็บใน `list<Task<T>>` ได้) copy ไม่ได้
-- `await` กิน Task (move) → await ซ้ำ = compile error
-- Task ที่ยังไม่ await ตอนออกจากฟังก์ชัน (return ปกติ) = compile error
-- ออกด้วย `throw` / `try` ที่ส่ง error ต่อ / panic → Task ที่ค้าง **ถูกยกเลิกและรอให้หยุดจริง** ก่อนออก
-- Task return หรือเก็บลง property ไม่ได้ (ต้อง await ในฟังก์ชันที่สร้าง) — ทำให้ไม่ต้องมี lifetime
+- `Task<T>` is a value with one owner; it can move (into a `list<Task<T>>`) but not be copied.
+- `await` consumes the task (a move), so awaiting twice is a compile error.
+- A task not awaited when the function returns normally is a compile error.
+- Leaving through `throw`, an error passed on by `try`, or a panic **cancels the pending tasks and waits for
+  them to stop** before leaving.
+- A task cannot be returned or stored in a property (it is awaited where it was started), so no lifetimes are
+  needed.
 
-### C2 — ยืมอ่านข้ามขอบ task ได้ ไม่ copy
-- argument ที่ไม่มี `&` = ยืมอ่าน การยืมจบเมื่อ `await` (ไม่ใช่ตอนบรรทัดนั้นจบ)
-- หลาย task ยืมอ่านของเดียวกันพร้อมกันได้
-- ระหว่างนั้นเจ้าของแก้/ย้ายไม่ได้ (กติกา R2 ของ ownership-v2)
-- ปลอดภัยข้าม thread เพราะ Pin ไม่มี refcount และไม่มี interior mutability
+### C2 — tasks borrow read-only data across threads without copying
+- An argument without `&` is a read-only borrow that ends at `await` (not at the end of the line).
+- Several tasks may borrow the same value at once.
+- Meanwhile the owner cannot change or move it (rule R2 in `ownership-v2.md`).
+- Safe across threads because Pin has no reference counting and no interior mutability.
 
-### C3 — `&` ส่งให้ task แก้ได้ แบบ exclusive
-- ห้ามมี task อื่นหรือเจ้าของใช้ของนั้นจนกว่าจะ await (กติกา R4)
-- → **data race เกิดไม่ได้** (compile error)
+### C3 — `&` lends to one task for changing, exclusively
+- No other task, and not the owner, may use it until the task is awaited (rule R4).
+- So **data races cannot compile.**
 
-### C4 — error และ panic
-- error จาก task ส่งกลับทาง `await` (`try await` / `try await ... catch`)
-- panic ใน task → ทั้ง request panic (500) ตาม error-handling E-R6
+### C4 — errors and panics
+- A task's error comes back through `await` (`try await` / `try await ... catch`).
+- A panic in a task panics the whole request (500), as in `error-handling.md` E-R6.
 
-### C5 — function ในตัว
-| function | ทำอะไร |
+### C5 — built-in functions
+| function | does |
 |---|---|
-| `await_all(list<Task<T>> $ts): list<T>` | รอครบ คืนผลตามลำดับเดิม · `throws` ถ้า task ใด throws · error ตัวแรก → ยกเลิกที่เหลือ |
-| `await_timeout(Task<T> $t, int $ms): T throws` | เกินเวลา → ยกเลิก task แล้ว throw `error(504, "timeout")` |
-| `await_any(list<Task<T>> $ts): T` | ได้ตัวแรกที่เสร็จ ยกเลิกที่เหลือ *(รอบหลัง)* |
+| `await_all(list<Task<T>> $ts): list<T>` | waits for all, results in the original order · `throws` if any task throws · the first error cancels the rest |
+| `await_timeout(Task<T> $t, int $ms): T throws` | past the time limit: cancels the task and throws `error(504, "timeout")` |
+| `await_any(list<Task<T>> $ts): T` | the first to finish; cancels the rest *(later)* |
 
-ไม่เพิ่ม keyword `timeout` — ใช้ function (syntax น้อยกว่า)
+No `timeout` keyword — a function keeps the syntax small.
 
-### C6 — การยกเลิก
-- cooperative: task หยุดที่จุดรอ I/O หรือ `await` ถัดไป
-- loop คำนวณยาวๆ: compiler ใส่จุดเช็คการยกเลิกที่หัว loop *(ต้องวัดค่าใช้จ่าย — คาดว่าเล็กมาก เป็น load + branch ที่ทายถูกเกือบตลอด)*
-- หลังยกเลิก ของที่ task เป็นเจ้าของถูกคืนตามกติกา ownership
+### C6 — cancellation
+- Cooperative: a task stops at its next I/O wait or `await`.
+- Long computing loops: the compiler adds a cancellation check at the loop head *(to measure — expected to be
+  tiny: one load and a well-predicted branch)*.
+- After cancellation, what the task owned is freed by the ownership rules.
 
 ### C7 — runtime
-- green thread M:N, work stealing ระหว่าง core, event loop ร่วมกับ HTTP server (kqueue บน macOS / epoll บน Linux)
-- stack ต่อ task: จองใน virtual memory + **guard page** → stack overflow = panic ไม่ใช่เขียนทับ
-- task รอ I/O ไม่บล็อก OS thread
-- `PN_THREADS` เดิมยังใช้กำหนดจำนวน OS thread
+- M:N green threads, work stealing between cores, one event loop shared with the HTTP server (kqueue on macOS,
+  epoll on Linux).
+- Each task's stack is reserved in virtual memory with a **guard page**: a stack overflow panics instead of
+  overwriting memory.
+- A task waiting for I/O does not block an OS thread.
+- `PN_THREADS` still sets the number of OS threads.
 
-### C8 — ไม่มี async/await แบบ JS/Rust
-ไม่มีฟังก์ชัน async แยกพวก ทุกฟังก์ชันใช้ `go` ได้ และถูกเรียกด้วย `go` ได้
+### C8 — no async/await split like JavaScript or Rust
+There are no separate "async" functions: every function can use `go`, and every function can be started with
+`go`.
 
-## ตัวอย่าง
+## Examples
 
 ```php
-// เรียกพร้อมกันใน handler
+// several calls at once inside a handler
 function profile(int $id): string throws {
     $u = go findUser($id);
     $o = go findOrders($id);
@@ -71,14 +85,14 @@ function profile(int $id): string throws {
     return json_encode(["user" => $user, "orders" => $orders, "points" => $points]);
 }
 
-// หลาย task ใน loop
+// many tasks in a loop
 function prices(list<int> $ids): list<float> throws {
     list<Task<float>> $tasks = [];
     foreach ($ids as $id) { $tasks[] = go fetchPrice($id); }
     return try await_all($tasks);
 }
 
-// หลาย core ยืมข้อมูลเดียวกัน
+// several cores borrowing the same data
 function stats(list<int> $xs): string {
     $half = intdiv(count($xs), 2);
     $a = go sumRange($xs, 0, $half);
@@ -90,7 +104,7 @@ function stats(list<int> $xs): string {
 $points = try await_timeout(go getPoints($id), 200) catch ($e) { 0; };
 ```
 
-## ตัวอย่าง error message
+## Example error messages
 ```
 profile.pn:3: error: task $u started on line 2 is not awaited when the function returns on line 3.
   Add await $u before returning
@@ -100,19 +114,19 @@ user.pn:4: error: $t was already awaited on line 3
 user.pn:5: error: findUser() can fail, so write try await $t
 ```
 
-## เลื่อนไปทีหลัง
+## Later
 
-| เรื่อง | แนวทาง |
+| topic | direction |
 |---|---|
-| channel | ส่ง = move ตามกติกาเดิม · ทำเมื่อมี use case producer/consumer จริง |
-| ข้อมูลร่วมข้าม request (cache, rate limit, DB pool) | ไม่มี global ของ user · runtime ให้ type สำเร็จรูปที่ปลอดภัย (`Cache`, `DbPool`) · ตัดสินพร้อมเรื่อง database |
-| งานหลังตอบ request (ส่ง email) | ไม่ใช้ `go` ปล่อยทิ้ง · runtime ให้ queue ที่มี retry และไม่ทำ error หาย |
+| channels | sending moves the value, as everywhere else · build when there is a real producer/consumer need |
+| data shared across requests (cache, rate limits, connection pools) | still no user globals · the runtime provides safe ready-made types (`Cache`, `DbPool`) · decide together with PostgreSQL |
+| work after the response (sending email) | not a fire-and-forget `go` · the runtime provides a queue with retries that never loses errors |
 
-## ลำดับ implement
+## Implementation order
 
-ต้องมาหลัง: Task 1 (build บน Mac + kqueue), control-flow analysis ร่วม, `throws`/`try`, panic → 500 (arena ต่อ request)
-1. runtime: green thread + stack พร้อม guard page + scheduler ต่อ core
-2. ผูก I/O ของ server เข้ากับ scheduler
-3. compiler: `go` / `await` / `Task<T>` + C1–C3
-4. `await_all`, `await_timeout`, การยกเลิก
-5. test: race ที่ต้อง compile error, ยกเลิกเมื่อ error, ASAN + TSAN สะอาด, วัด overhead ของ `go` ต่อ task
+Needs first: `throws` / `try`.
+1. Runtime: green threads, stacks with guard pages, a scheduler per core.
+2. Tie the server's I/O into the scheduler.
+3. Compiler: `go` / `await` / `Task<T>` and C1–C3.
+4. `await_all`, `await_timeout`, cancellation.
+5. Tests: races that must not compile, cancellation on error, ASAN + TSAN clean, the cost of `go` per task.
