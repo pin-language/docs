@@ -341,7 +341,7 @@ Request helpers (all take strings and never fail on bad input):
 - **Nested JSON**: `json_raw($json, "key")` gives the JSON text of a nested object/array, to read again:
   `json_int(json_raw(json_raw($body, "params"), "arguments"), "n")`. Arrays: `json_len($arr)` items,
   `json_at($arr, $i)` one item; read a plain item with key `""`: `json_string(json_at($tags, 0), "")`.
-- **Standard input**: `$line = try read_line() catch ($e) { break; };` (end of input fails with code 1; output
+- **Standard input**: `$line = try read_line() catch ($e) { break; };` (note the `;` after `}`) (end of input fails with code 1; output
   is flushed before it waits). An MCP server over stdio: the `github.com/pin-language/mcp` package.
 
 Database (SQLite) — one connection per request, closed automatically:
@@ -398,6 +398,27 @@ function rpc(string $body): string {
 echo rpc("{\"jsonrpc\":\"2.0\",\"id\":\"abc\",\"method\":\"tools/call\",\"params\":{\"arguments\":{\"n\":3}}}"), "\n";
 ```
 
+**Build replies with classes and `json_encode`, not by writing JSON in strings.** In every test, hand-written
+JSON strings were where AI-written servers broke: a missing `}` (invalid JSON the client cannot read), or text
+pasted in unescaped. A class cannot get the braces wrong:
+
+```php
+class Info { public function __construct(public string $name, public string $version) {} }
+class Caps { public Empty $tools; function __construct() { $this->tools = new Empty(); } }
+class Empty {}
+class InitResult {
+    public string $protocolVersion = "2025-06-18";
+    public Caps $capabilities;
+    public Info $serverInfo;
+    function __construct() { $this->capabilities = new Caps(); $this->serverInfo = new Info("my-server", "1.0.0"); }
+}
+$id = "7";                                              // from json_raw($body, "id")
+echo "{\"jsonrpc\":\"2.0\",\"id\":" . $id . ",\"result\":" . json_encode(new InitResult()) . "}\n";
+```
+
+**Never answer a notification** (a message without `id`, such as `notifications/initialized`): over stdio send
+nothing; over HTTP `http_status(202); return "";`. Simplest of all: use the package below, which does both.
+
 **Never paste text into JSON by hand.** `"\"text\":\"Hello, " . $who . "\""` breaks (and lets a caller inject
 JSON) as soon as `$who` contains `"` or a newline: write `"\"text\":" . json_encode("Hello, " . $who)`, or better
 put the values in a class and `json_encode` the object, as above. Only `json_raw` output (already JSON) may be
@@ -406,8 +427,7 @@ pasted in as it is.
 MCP's `initialize` answer must announce its tools, or clients may never list them:
 `"capabilities":{"tools":{}}`.
 
-Answer a body that is not JSON with `-32700` (`json_len($body) < 0` is a quick test), and a notification (no
-`id`, e.g. `notifications/initialized`) over HTTP with `http_status(202); return "";`.
+Answer a body that is not JSON with `-32700` (`json_len($body) < 0` is a quick test).
 
 For a full MCP server over stdio use the package [`github.com/pin-language/mcp`](https://github.com/pin-language/mcp)
 (`pin get github.com/pin-language/mcp@v0.1.0`, then `import github.com/pin-language/mcp/mcp;`): it handles
