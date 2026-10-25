@@ -132,6 +132,36 @@ Before building: one handler that does `db_open` + one `SELECT` per request, und
 handler with the connection kept (a hand-made test build). If SQLite gains little, K1–K5 still go in (they
 are what PostgreSQL needs) but the speed claim for SQLite is dropped.
 
+### Step 0 results (2026-10-25, owner's Apple M2, macOS, best of 3 — measured, with caveats)
+
+CLI loop, 100,000 × (`db_open` + one `SELECT` by primary key + close), 1,000-row table:
+
+| | time | per call |
+|---|---|---|
+| open + close every call (each close is the last connection: SQLite checkpoints the WAL) | 20.6 s | ~206 µs |
+| open + close every call, another connection kept open | 7.7 s | ~77 µs |
+| one connection for all calls | 0.35 s | ~3.5 µs |
+| test-only pooled runtime (4 idle handles per thread), same code as the first row | 0.35 s | ~3.5 µs |
+
+HTTP, handler = `db_open` + `db_json` of one row; keep-alive load generator (C, 2 threads × 16 connections,
+5 s) on the same machine; 8 server threads:
+
+| server | req/s (3 runs) |
+|---|---|
+| no database (same handler shape) | 275k–289k |
+| today: `db_open` per request | 24.6k–26.0k |
+| test-only pool | 167k–186k |
+
+**SQLite gains ~6.8× per request**: the pool is worth it for SQLite too, not only for PostgreSQL. Caveats:
+load generator on the same 8 cores; one read-only query on a tiny table (real handlers do more per request,
+so the gain in real apps is smaller); macOS only, not re-run on Linux. Outputs were checked (same JSON from
+both servers, 0 bad responses).
+
+**Found while measuring:** every HTTP request wrote into freed memory (`request_done` freed the request while
+`cur_req` still pointed at it; `leave_task` copied it back into the task and `task_release` wrote through it).
+Under load with database handlers it crashed the server (SIGSEGV). Fixed in the pin repo; CI now runs the
+HTTP servers under ASAN + UBSAN (`run_tests.py --sanitize`), which `tools/sanitize.sh` could not do.
+
 ## Implementation order
 
 1. Step 0 measurement (SQLite).
@@ -140,7 +170,13 @@ are what PostgreSQL needs) but the speed claim for SQLite is dropped.
 4. Tests (normal, panic in transaction, cancel, pool full) + ASAN/UBSAN; ai-guide and reference pages.
 5. PostgreSQL (P4) uses the same pool.
 
-## Open questions for the owner
+## Decisions (owner, 2026-10-25: Q1–Q3 as proposed)
+
+- K3: a `db` / `rows` cannot be passed to `go` — **agreed**.
+- K4: statements that change session state are compile errors — **agreed**.
+- K5 defaults 4 per thread, 60 s idle, 5 s wait then 503 — **agreed**, to revisit after measuring.
+
+## Questions as asked
 
 - **Q1** K3 breaks programs that pass a `db` to `go` today. Proposed: yes (needed for PostgreSQL; no speed
   lost with SQLite).
