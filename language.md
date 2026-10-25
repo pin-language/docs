@@ -246,15 +246,18 @@ function handle(string $method, string $path, string $body): string { ... }
 serve(8080, "handle");
 ```
 
-- The handler must have exactly this signature. Its return value is the response body
-  (`Content-Type: application/json`). `http_status(404)` sets the status for this response.
+- The handler must have exactly this signature (it may add `throws`). Its return value is the response body
+  (`Content-Type: application/json` unless you set another). `http_status(404)` sets the status for this response.
 - `$path` includes the query string as sent. `url_path($path)` drops it; `query_param($path, "k")` reads one
   value (decoded, `""` if absent); `query_has($path, "k")` tells absent from empty. For a form body use
   `form_param($body, "k")` / `form_has($body, "k")`.
 - JSON bodies: `json_has($body, "k")`, `json_string`, `json_int`, `json_float`, `json_bool` read one top-level
   key of a JSON object and return `""` / `0` / `0.0` / `false` when the key is missing, has another type, or
   the body is not a JSON object. Nested values are skipped safely; there is no full `json_decode` yet.
-- There is no header API yet.
+- Headers: `request_header("Authorization")` (case-insensitive, trimmed, `""` if absent),
+  `request_has_header("X-Key")`, `response_header("Location", "/new")` (call it again for `Set-Cookie`;
+  `Content-Type` replaces the default). A value with CR/LF or another control byte panics, so request data
+  cannot inject headers; `Content-Length`, `Connection`, `Transfer-Encoding` and `Date` belong to the server.
 
 ## Modules and packages
 
@@ -280,11 +283,17 @@ violations make `db_exec` return -1 (`db_error` explains); other SQL errors pani
 [reference/database.md](reference/database.md). On Linux, building a program that uses the database needs
 SQLite's development files (`sudo apt install libsqlite3-dev`).
 - One thread per CPU core (`PN_THREADS=n` to change). Keep-alive and pipelining are supported.
-- Limits: 64 KB of headers, 64 MB of body. No TLS, no HTTP/2, no timeouts: **for local testing only.**
+- Limits: 64 KB of headers (431), 64 MB of body (413). A request must arrive completely within 15 s of its
+  first byte (408; a new connection must send its first request in that time too), an idle keep-alive
+  connection closes after 60 s, an unread response after 30 s, and at most 10 000 connections are open (503).
+  Change them with `PN_READ_TIMEOUT_MS`, `PN_IDLE_TIMEOUT_MS`, `PN_WRITE_TIMEOUT_MS`, `PN_MAX_CONNS`.
+- `Transfer-Encoding` (chunked bodies) is refused with 501, and a `Content-Length` that is not plain digits or
+  appears twice with different values gets 400, so requests cannot be smuggled past a proxy.
+- No TLS and no HTTP/2: put it behind a reverse proxy (nginx, Caddy) for anything public.
 
 ## Not in Pin yet
 
 Inheritance and interfaces, `null` and `?Type`, `finally`, default parameter values,
 closures, sorting with a custom comparison, a full `json_decode`
-(nested objects and arrays), request headers, databases other than SQLite (PostgreSQL is next), `go`/`await`. Designs for most of these are in
+(nested objects and arrays), TLS, databases other than SQLite (PostgreSQL is next), `go`/`await`. Designs for most of these are in
 [`design/`](design/).

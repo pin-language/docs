@@ -4,8 +4,8 @@
 
 A Pin program can be a complete HTTP server: no web server, no PHP-FPM, one native file.
 
-> The server is a preview: no TLS, no request headers and no timeouts yet. Use it locally; do not expose
-> it to the internet.
+> The server is a preview: no TLS and no HTTP/2. It has timeouts and limits against slow clients, but for
+> anything public put it behind a reverse proxy (nginx, Caddy) that handles TLS.
 
 ## The smallest server
 
@@ -187,6 +187,52 @@ curl localhost:8080/menu
 curl 'localhost:8080/quote?item=cake&qty=3'
 curl -X POST -d '{"item":"tea","qty":2}' localhost:8080/quote
 ```
+
+## Headers
+
+Read a request header with `request_header()`. It returns `""` when the header is absent, and the name is
+matched without case. Add response headers with `response_header()`:
+
+<!-- check: skip -->
+```php
+function handle(string $method, string $path, string $body): string {
+    if (request_header("Authorization") != "Bearer secret-token") {
+        http_status(401);
+        return "{\"error\":\"login first\"}";
+    }
+    if (url_path($path) == "/old") {
+        http_status(301);
+        response_header("Location", "/new");
+        return "";
+    }
+    response_header("Cache-Control", "no-store");
+    return "{\"ok\":true}";
+}
+serve(8080, "handle");
+```
+
+```bash
+curl -i -H "Authorization: Bearer secret-token" localhost:8080/old
+```
+
+```text
+HTTP/1.1 301 Moved Permanently
+Content-Type: application/json
+Location: /new
+Content-Length: 0
+```
+
+A header value that contains a line break panics instead of being sent. So even when a value comes from the
+request, a client cannot use it to add headers of its own ("header injection").
+
+The server also protects itself:
+
+- A client that sends a request too slowly is dropped with 408.
+- An idle connection is closed.
+- When too many connections are open, new ones get 503.
+
+These limits stop a few slow clients from tying up the server (a "slowloris" attack). The
+[language guide](../language.md) lists the limits and how to change them.
 
 ## When a handler fails
 
