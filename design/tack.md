@@ -1,9 +1,23 @@
 # Tack — the web framework for Pin
 
-**Status (2026-10-25):** design draft, **nothing built, on hold** until the language prerequisites below are
-done (owner, 2026-10-25, after a review of this draft). Name and install model agreed with the owner; the
-rest was decided in the same brainstorm by the rule below and is open to change until milestone M1 is built.
-Open questions for the owner are in the last section.
+**Status (2026-10-26):** **M1 built** in github.com/pin-language/tack (package `tack.pn`, the `tack`
+command, `examples/shop`, CI on Linux and macOS); needs Pin from `next`. Prerequisites P1, P2, P5 and
+parameter defaults are built (table below); null and the PostgreSQL driver are not. Open questions for the
+owner are in the last section.
+
+### M1 as built (decisions made while building; they change the text below where it differs)
+- **The generator is in the `tack` command, not in the Pin compiler** (answers Q2 for M1): it reads `routes/`
+  with pinac's parser and writes `_tack_app.pn` / `_tack_main.pn` / `_tack_test.pn` as plain Pin. The only
+  compiler changes: `[name]` parts in import paths, and `Error` as a type in modules. Compile errors still
+  point at the route files.
+- Return types: `string` → 200 as is, class/list/map → 200 `json_encode`, `void` → 204, `tack::Res` → as
+  chosen. A thrown 4xx → `{"error": message}`; anything else is thrown on to the server (500, message logged).
+- T9 tests without a port need no runtime change: tests call the generated `app::get/post/...`, which run
+  the dispatcher with headers from the test (`tack::Req` reads real headers only in a live server).
+- Not in M1: guards (every route is public until M3 — T4's deny-by-default arrives with them), `HEAD` /
+  `OPTIONS` (405), CORS settings, `stream`, deadlines, OpenAPI/MCP. Path values are not percent-decoded.
+- Speed gate, measured: `GET /` through Tack 221k–277k req/s vs a hand-written `serve()` 220k–260k (M2, load
+  generator on the same machine): no difference beyond the noise.
 
 ## Prerequisites (in the language, before Tack)
 
