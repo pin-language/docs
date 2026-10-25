@@ -398,6 +398,14 @@ function rpc(string $body): string {
 echo rpc("{\"jsonrpc\":\"2.0\",\"id\":\"abc\",\"method\":\"tools/call\",\"params\":{\"arguments\":{\"n\":3}}}"), "\n";
 ```
 
+**Never paste text into JSON by hand.** `"\"text\":\"Hello, " . $who . "\""` breaks (and lets a caller inject
+JSON) as soon as `$who` contains `"` or a newline: write `"\"text\":" . json_encode("Hello, " . $who)`, or better
+put the values in a class and `json_encode` the object, as above. Only `json_raw` output (already JSON) may be
+pasted in as it is.
+
+MCP's `initialize` answer must announce its tools, or clients may never list them:
+`"capabilities":{"tools":{}}`.
+
 Answer a body that is not JSON with `-32700` (`json_len($body) < 0` is a quick test), and a notification (no
 `id`, e.g. `notifications/initialized`) over HTTP with `http_status(202); return "";`.
 
