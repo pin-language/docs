@@ -1,8 +1,24 @@
 # Tack — the web framework for Pin
 
-**Status (2026-10-25):** design draft, **nothing built**. Name and install model agreed with the owner
-(2026-10-25); the rest was decided in the same brainstorm by the rule below and is open to change until
-milestone M1 is built. Open questions for the owner are in the last section.
+**Status (2026-10-25):** design draft, **nothing built, on hold** until the language prerequisites below are
+done (owner, 2026-10-25, after a review of this draft). Name and install model agreed with the owner; the
+rest was decided in the same brainstorm by the rule below and is open to change until milestone M1 is built.
+Open questions for the owner are in the last section.
+
+## Prerequisites (in the language, before Tack)
+
+The review of this draft found that Tack would be fast only in hello-world: the language is missing parts
+every web app needs, framework or not.
+
+| # | what | why it blocks Tack |
+|---|---|---|
+| P1 | **resources that outlive a request** — a database connection pool (per worker thread, so no locks: tasks never leave their thread) | no globals means a new connection per request; fine for SQLite, far too slow for PostgreSQL |
+| P2 | `json_decode` into a class | T3 validation, T8 typed client calls, class return values |
+| P3 | `null` (null.md) and parameter defaults | optional query values and JSON fields |
+| P4 | PostgreSQL on the pool, plus a safe way to build queries with optional filters and sorting | the literal-SQL rule allows no search/filter endpoints today; T7's build-time check only covers SQLite |
+| P5 | crypto built-ins (random tokens, sha256/HMAC, password hashing) | real auth (T4); packages cannot contain C |
+
+Then build **M1 only** and use it for one real app before deciding which of M2–M6 to build.
 
 Decision rule: memory safety > speed > clarity > looking like PHP.
 Main users are AI coding agents: every rule below is chosen so that a mistake is a **build error with the fix
