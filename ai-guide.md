@@ -387,6 +387,7 @@ class Reply { public function __construct(public string $text) {} }
 
 function rpc(string $body): string {
     $id = json_raw($body, "id");                       // "7" or "\"abc\"": copied as is
+    if ($id == "") { $id = "null"; }                   // no id (bad JSON, or a notification): JSON null
     $params = json_raw($body, "params");
     $n = json_int(json_raw($params, "arguments"), "n");
     if (json_string($body, "method") != "tools/call") {
@@ -396,6 +397,9 @@ function rpc(string $body): string {
 }
 echo rpc("{\"jsonrpc\":\"2.0\",\"id\":\"abc\",\"method\":\"tools/call\",\"params\":{\"arguments\":{\"n\":3}}}"), "\n";
 ```
+
+Answer a body that is not JSON with `-32700` (`json_len($body) < 0` is a quick test), and a notification (no
+`id`, e.g. `notifications/initialized`) over HTTP with `http_status(202); return "";`.
 
 For a full MCP server over stdio use the package [`github.com/pin-language/mcp`](https://github.com/pin-language/mcp)
 (`pin get github.com/pin-language/mcp@v0.1.0`, then `import github.com/pin-language/mcp/mcp;`): it handles
