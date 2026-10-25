@@ -379,6 +379,15 @@ serve(8080, "handle");
   (`$sql .= $sort`) does not compile. Secrets such as a database URL: `env("DATABASE_URL")`.
 - Every `db_*` function: [reference/database.md](https://github.com/pin-language/docs/blob/HEAD/reference/database.md).
 
+`json_decode` errors (all code 400, message = path + reason): `$: missing field "qty"`, `$: unknown field
+"extra"` (unknown fields are refused, not ignored), `$: field "qty" appears twice`, `$.qty: want an integer, got
+a string`, `invalid JSON: ... at byte N`; a constructor's own `throw error(400, "...")` comes through as it is.
+
+Session tokens in a database: store `hash("sha256", $token)` and look the row up by that hash
+(`WHERE token_hash = ?`): the client cannot steer a comparison against a value it does not know, and a stolen
+database does not contain usable tokens. `hash_equals` is for comparing two secrets in memory (an API key from
+the environment, an HMAC signature).
+
 Sign-in and secrets: store `password_hash($password)` (PBKDF2-SHA256, ~0.5 s: only at sign-up / login) and check
 with `password_verify($password, $hash)`. Session tokens and API keys: `random_token(16)`, compared with
 `hash_equals($known, $given)` (never `==`). Signatures: `hash_hmac("sha256", $data, $key)`. Random numbers:
