@@ -81,8 +81,10 @@ function area(float $w, float $h): float { return $w * $h; }
 function log_line(string $s): void { echo $s, "\n"; }
 ```
 
-Parameter and return types are required. Recursion works. There are no default values, no named
-arguments and no variadics yet.
+Parameter and return types are required. Recursion works. Parameters may have defaults, last in the list
+and written as literals like property defaults: `function page(string $q, int $limit = 20, bool $desc = false)`;
+a call leaves out trailing ones (`page("tea")`, `page("tea", 5)`). A `&` parameter cannot have one. There are
+no named arguments and no variadics yet.
 
 A parameter declared with `&` may change the caller's value; the call writes `&` too:
 
@@ -334,7 +336,6 @@ http://127.0.0.1:9001 {                 # outgoing: Pin calls http://127.0.0.1:9
 
 ## Not in Pin yet
 
-Inheritance and interfaces, `null` and `?Type`, `finally`, default parameter values,
-closures, sorting with a custom comparison, a full `json_decode`
-(nested objects and arrays), databases other than SQLite (PostgreSQL is next), WebSocket. Designs for most of these are in
+Inheritance and interfaces, `null` and `?Type`, `finally`,
+closures, sorting with a custom comparison, databases other than SQLite (PostgreSQL is next), WebSocket. Designs for most of these are in
 [`design/`](design/).

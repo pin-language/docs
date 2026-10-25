@@ -479,7 +479,7 @@ initialize, ids, notifications and errors; its README has a complete server.
 | `file_get_contents("http://...")`, curl | `try http_get($url, [], 5000)` (http:// only) |
 | Swoole / ReactPHP coroutines, `Promise` | `$t = go f(); ... try await $t;` |
 | `foreach ($xs as &$x)` | the same (not for bools); the `&` variable is gone after the loop |
-| default parameter values `int $n = 1` | not yet — pass every argument |
+| default parameter values `int $n = 1` | the same, literals only, last in the list (no named arguments) |
 
 ## Built-ins (complete list)
 

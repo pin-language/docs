@@ -159,7 +159,8 @@ tea x2
 ```
 
 - The class comes from where the value goes: `Order $o = try json_decode($body);`, or `return try json_decode($body);` in a function declared `: Order throws`. The top level must be a JSON object.
-- Strict: a missing field, an unknown field, a field given twice, a wrong type (`"2"` for an int, `1.5` for an int, `null`), invalid JSON or nesting deeper than 64 levels fail with `error(400, "<path>: <what>")`, e.g. `$.lines[1].qty: want an integer, got a string`. Every public field must be there (optional fields come with `null`, which Pin does not have yet).
+- Strict: a missing field, an unknown field, a field given twice, a wrong type (`"2"` for an int, `1.5` for an int, `null`), invalid JSON or nesting deeper than 64 levels fail with `error(400, "<path>: <what>")`, e.g. `$.lines[1].qty: want an integer, got a string`.
+- Optional fields: give the constructor parameter a default (`public int $limit = 20`); a field may then be left out. Every other field must be there (a class without `__construct` needs all its public properties).
 - A class with `__construct` is built by calling it with the JSON fields named like its parameters, so its checks run (throw `error(400, ...)` there). A class without one gets its public properties filled.
 - Fields may be int, float (an integer is accepted), bool, string, other classes, `list<T>` and `map<string,T>` of those, nested to any depth. `map<int,...>` does not compile (JSON keys are strings).
 - Inside a `throws` handler an escaping 400 answers `{"error":"Bad Request"}` without the message; catch it to send the message: `try json_decode($body) catch ($e) { http_status(400); return json_encode(["error" => $e->message]); }`.
