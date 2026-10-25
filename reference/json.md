@@ -5,6 +5,9 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | | |
 |---|---|
 | [`json_encode`](#json_encode) | JSON text for a value. |
+| [`json_raw`](#json_raw) | The JSON text of one value of an object (an object, an array or anything), to read further with the json_* functions. |
+| [`json_len`](#json_len) | The number of items of a JSON array (or keys of an object); -1 when the text is neither. |
+| [`json_at`](#json_at) | The JSON text of item `$i` (from 0) of a JSON array, or `""` when there is no such item. |
 | [`json_has`](#json_has) | Whether a JSON object has a top-level key. |
 | [`json_string`](#json_string) | A top-level string value, or `""`. |
 | [`json_int`](#json_int) | A top-level integer value, or 0. |
@@ -38,6 +41,74 @@ Output:
 - Objects become JSON objects of their public properties, in declaration order; private properties are left out.
 - A map has one value type; for a JSON object with mixed values, use a class.
 - **PHP:** PHP escapes non-ASCII as `\uXXXX` and drops `.0` unless `JSON_PRESERVE_ZERO_FRACTION` is set.
+
+## json_raw
+
+```php
+json_raw(string $json, string $key): string
+```
+
+The JSON text of one value of an object (an object, an array or anything), to read further with the json_* functions.
+
+```php
+$body = "{\"params\": {\"name\": \"add\", \"arguments\": {\"a\": 5, \"b\": 10}}}";
+$params = json_raw($body, "params");
+$args = json_raw($params, "arguments");
+echo json_string($params, "name"), " ", json_int($args, "a") + json_int($args, "b"), "\n";
+```
+
+Output:
+
+```
+add 15
+```
+
+- `""` when the key is missing or the text is not a JSON object.
+- The key `""` means "the text itself": `json_string(json_at($list, 0), "")` reads an array item.
+- The text is copied as it was sent, so `json_raw($body, "id")` can be written back into an answer as is.
+- **PHP:** Instead of `json_decode($body, true)['params']['arguments']`: one level at a time.
+
+## json_len
+
+```php
+json_len(string $json): int
+```
+
+The number of items of a JSON array (or keys of an object); -1 when the text is neither.
+
+```php
+echo json_len("[1, 2, 3]"), " ", json_len("{\"a\": 1}"), " ", json_len("7"), "\n";
+```
+
+Output:
+
+```
+3 1 -1
+```
+
+## json_at
+
+```php
+json_at(string $json, int $i): string
+```
+
+The JSON text of item `$i` (from 0) of a JSON array, or `""` when there is no such item.
+
+```php
+$tags = "[\"tea\", \"cake\"]";
+for ($i = 0; $i < json_len($tags); $i++) {
+    echo json_string(json_at($tags, $i), ""), "\n";
+}
+```
+
+Output:
+
+```
+tea
+cake
+```
+
+- Read an item with key `""`: `json_int(json_at($nums, 0), "")`; an item that is an object with its keys.
 
 ## json_has
 

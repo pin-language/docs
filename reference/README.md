@@ -22,7 +22,7 @@ New to Pin? Start with the [language guide](../language.md). Writing Pin with an
 
 ## [JSON](json.md)
 
-[`json_encode`](json.md#json_encode), [`json_has`](json.md#json_has), [`json_string`](json.md#json_string), [`json_int`](json.md#json_int), [`json_float`](json.md#json_float), [`json_bool`](json.md#json_bool)
+[`json_encode`](json.md#json_encode), [`json_raw`](json.md#json_raw), [`json_len`](json.md#json_len), [`json_at`](json.md#json_at), [`json_has`](json.md#json_has), [`json_string`](json.md#json_string), [`json_int`](json.md#json_int), [`json_float`](json.md#json_float), [`json_bool`](json.md#json_bool)
 
 ## [HTTP](http.md)
 
@@ -46,4 +46,4 @@ New to Pin? Start with the [language guide](../language.md). Writing Pin with an
 
 ## [Other servers and programs](client.md)
 
-[`http_get`](client.md#http_get), [`http_post`](client.md#http_post), [`http_stream`](client.md#http_stream), [`stream_next`](client.md#stream_next), [`stream_last_id`](client.md#stream_last_id), [`run`](client.md#run)
+[`http_get`](client.md#http_get), [`http_post`](client.md#http_post), [`http_stream`](client.md#http_stream), [`stream_next`](client.md#stream_next), [`stream_last_id`](client.md#stream_last_id), [`read_line`](client.md#read_line), [`run`](client.md#run)

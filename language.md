@@ -253,7 +253,10 @@ serve(8080, "handle");
   `form_param($body, "k")` / `form_has($body, "k")`.
 - JSON bodies: `json_has($body, "k")`, `json_string`, `json_int`, `json_float`, `json_bool` read one top-level
   key of a JSON object and return `""` / `0` / `0.0` / `false` when the key is missing, has another type, or
-  the body is not a JSON object. Nested values are skipped safely; there is no full `json_decode` yet.
+  the body is not a JSON object. Nested values: `json_raw($json, "key")` returns the JSON text of any value
+  (to read with the same functions), `json_len($array)` and `json_at($array, $i)` walk arrays, and the key `""`
+  reads the text itself (`json_string(json_at($tags, 0), "")`). There is no `json_decode` into Pin values.
+- Standard input: `try read_line()` (one line; fails with code 1 at the end; flushes output first).
 - Headers: `request_header("Authorization")` (case-insensitive, trimmed, `""` if absent),
   `request_has_header("X-Key")`, `response_header("Location", "/new")` (call it again for `Set-Cookie`;
   `Content-Type` replaces the default). A value with CR/LF or another control byte panics, so request data

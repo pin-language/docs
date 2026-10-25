@@ -142,7 +142,7 @@ $user = ["name" => "Ann", "age" => 30];
 Error:
 
 ```text
-example.pn:1: error: a map holds one value type: this literal is map<string,string> (from its first value), but a value here is int. For a JSON object with mixed values, build the string: "{\"a\":" . json_encode($text) . ",\"n\":" . $n . "}"
+example.pn:1: error: a map holds one value type: this literal is map<string,string> (from its first value), but a value here is int. For a JSON object with values of different types, declare a class with those properties and json_encode() an object of it (see the AI guide, Classes)
 ```
 
 Lists of lists and maps of lists are not there yet either. For records with mixed fields, use separate

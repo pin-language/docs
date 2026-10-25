@@ -9,6 +9,7 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`http_stream`](#http_stream) | Open a Server-Sent Events stream (for example a board an agent listens to) and keep it open. |
 | [`stream_next`](#stream_next) | The data of the next event of the stream (several `data:` lines joined with newlines; comments skipped). |
 | [`stream_last_id`](#stream_last_id) | The id of the last event read (0 before any had one). |
+| [`read_line`](#read_line) | One line of standard input, without its line ending. Fails with code 1 at the end of the input. |
 | [`run`](#run) | Run a program and return what it printed. There is no shell: each argument reaches the program as it is. |
 
 ## http_get
@@ -104,6 +105,27 @@ echo stream_last_id($s), "\n";
 ```
 
 (Starts a server; not run in the docs.)
+
+## read_line
+
+```php
+read_line(): string throws
+```
+
+One line of standard input, without its line ending. Fails with code 1 at the end of the input.
+
+```php
+while (true) {
+    $line = try read_line() catch ($e) { break; };    // the input ended
+    echo strtoupper($line), "\n";
+}
+```
+
+(Starts a server; not run in the docs.)
+
+- What was echoed so far is flushed before it waits, so a program answering line by line (MCP over stdio) is never stuck with its answer in a buffer.
+- Waiting does not hold the thread: other tasks keep running.
+- **PHP:** Instead of `fgets(STDIN)`.
 
 ## run
 
