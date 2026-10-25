@@ -47,3 +47,7 @@ New to Pin? Start with the [language guide](../language.md). Writing Pin with an
 ## [Other servers and programs](client.md)
 
 [`http_get`](client.md#http_get), [`http_post`](client.md#http_post), [`http_stream`](client.md#http_stream), [`stream_next`](client.md#stream_next), [`stream_last_id`](client.md#stream_last_id), [`read_line`](client.md#read_line), [`run`](client.md#run)
+
+## [Security (hashes, passwords, random)](security.md)
+
+[`hash`](security.md#hash), [`hash_hmac`](security.md#hash_hmac), [`hash_equals`](security.md#hash_equals), [`random_token`](security.md#random_token), [`random_int`](security.md#random_int), [`password_hash`](security.md#password_hash), [`password_verify`](security.md#password_verify)
