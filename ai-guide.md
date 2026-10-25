@@ -380,6 +380,26 @@ The server closes slow or idle clients by itself (408 / idle close / 503 over 10
 `PN_READ_TIMEOUT_MS`, `PN_IDLE_TIMEOUT_MS`, `PN_WRITE_TIMEOUT_MS`, `PN_MAX_CONNS`). **No TLS, by design**: a
 reverse proxy / load balancer does https in front of `serve()`.
 
+JSON-RPC (MCP-style): read nested params with `json_raw`, send the id back exactly as it came (number or string):
+
+```php
+class Reply { public function __construct(public string $text) {} }
+
+function rpc(string $body): string {
+    $id = json_raw($body, "id");                       // "7" or "\"abc\"": copied as is
+    $params = json_raw($body, "params");
+    $n = json_int(json_raw($params, "arguments"), "n");
+    if (json_string($body, "method") != "tools/call") {
+        return "{\"jsonrpc\":\"2.0\",\"id\":" . $id . ",\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}";
+    }
+    return "{\"jsonrpc\":\"2.0\",\"id\":" . $id . ",\"result\":" . json_encode(new Reply("n is " . strval($n))) . "}";
+}
+echo rpc("{\"jsonrpc\":\"2.0\",\"id\":\"abc\",\"method\":\"tools/call\",\"params\":{\"arguments\":{\"n\":3}}}"), "\n";
+```
+
+For a full MCP server over stdio use the package `github.com/pin-language/mcp` (it handles initialize, ids,
+notifications and errors).
+
 ## PHP → Pin
 
 | PHP | Pin |
