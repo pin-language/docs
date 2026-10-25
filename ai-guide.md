@@ -397,8 +397,9 @@ function rpc(string $body): string {
 echo rpc("{\"jsonrpc\":\"2.0\",\"id\":\"abc\",\"method\":\"tools/call\",\"params\":{\"arguments\":{\"n\":3}}}"), "\n";
 ```
 
-For a full MCP server over stdio use the package `github.com/pin-language/mcp` (it handles initialize, ids,
-notifications and errors).
+For a full MCP server over stdio use the package [`github.com/pin-language/mcp`](https://github.com/pin-language/mcp)
+(`pin get github.com/pin-language/mcp@v0.1.0`, then `import github.com/pin-language/mcp/mcp;`): it handles
+initialize, ids, notifications and errors; its README has a complete server.
 
 ## PHP → Pin
 
