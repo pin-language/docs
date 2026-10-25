@@ -9,7 +9,7 @@ compiled to native code through LLVM, with compile-time ownership instead of a g
 | [ai-guide.md](ai-guide.md) | **AI coding agents** — the whole language on one page: rules, idioms, PHP → Pin table, error → fix table | English |
 | [language.md](language.md) | people learning Pin | English |
 | [reference/](reference/README.md) | **every built-in function, constant and cast** — signature, example with its real output, edge cases, differences from PHP | English |
-| [design/](design/) | design decisions for features that are agreed but mostly not built yet (ownership v2 with classes, error handling, null, strings/UTF-8, concurrency, int overflow); each starts with its current status | English |
+| [design/](design/) | design decisions for features that are agreed but mostly not built yet (ownership v2 with classes, error handling, null, strings/UTF-8, concurrency, int overflow, the Tack web framework); each starts with its current status | English |
 
 ## Using the AI guide with an agent
 
