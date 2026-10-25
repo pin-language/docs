@@ -1,6 +1,6 @@
-# The Pin language guide (0.5)
+# The Pin language guide (0.6)
 
-Pin reads like PHP 8 and compiles to a native binary. This guide covers everything the 0.5 compiler
+Pin reads like PHP 8 and compiles to a native binary. This guide covers everything the 0.6 compiler
 accepts. Anything not listed here is not supported yet.
 
 ## Files and running
@@ -208,8 +208,35 @@ walks over it.
 A panic is a run-time error the compiler could not rule out: index out of range, missing map key,
 division by zero, `intdiv(PHP_INT_MIN, -1)`, an allocation too large, `(int)` of a bad float.
 It prints `panic: ...` with the line and stops the program with exit code 1. Inside
-an HTTP handler it answers 500 instead and the server keeps running. There is no way to catch a panic;
-`try`/`catch` for expected errors is designed ([`design/error-handling.md`](design/error-handling.md)) but not built.
+an HTTP handler it answers 500 instead and the server keeps running. A panic cannot be caught.
+
+## Errors: throws, try, catch
+
+<!-- check: skip -->
+```php
+function findUser(int $id): User throws {
+    if ($id <= 0) { throw error(400, "bad id"); }
+    ...
+}
+$u = try findUser($id);                                   // pass the error on (the function must be throws)
+$u = try findUser($id) catch ($e) { return "{}"; };       // handle it: return / throw, or end with a value
+$name = try nameOf($id) catch ($e) { "guest"; };
+try { $a->withdraw(30); $b->deposit(30); } catch ($e) { echo $e->message; }
+```
+
+- A function or method that can fail is declared `: T throws` (a constructor: `__construct(...) throws`, and
+  then `new` needs `try`). Only it may `throw` or pass errors on with a bare `try`; inside `try { } catch`
+  any function may.
+- Every call that can fail needs `try`: forgetting it does not compile. A `try` with nothing that can fail
+  is also an error.
+- One error type, `Error`, with public `$code` (int) and `$message` (string); make one with
+  `error($code, $message)`. `catch ($e)`, `catch (Error $e)` and `catch (Exception $e)` are the same; one
+  catch per try; no `finally`.
+- Errors are returned next to the result (no stack unwinding): free when nothing fails. Ownership is checked
+  on the error path too, and everything the failing code owned is freed.
+- Escaping the top level: prints `error: <message> (code N)`, exit code 1. Leaving a `serve()` handler
+  declared `throws`: status = code if 400–599, else 500; body `{"error":"<standard status text>"}`; the
+  message goes to stderr only.
 
 ## HTTP server
 
@@ -257,7 +284,7 @@ SQLite's development files (`sudo apt install libsqlite3-dev`).
 
 ## Not in Pin yet
 
-Inheritance and interfaces, `null` and `?Type`, `try`/`catch`/`throws`, default parameter values,
+Inheritance and interfaces, `null` and `?Type`, `finally`, default parameter values,
 closures, sorting with a custom comparison, a full `json_decode`
 (nested objects and arrays), request headers, databases other than SQLite (PostgreSQL is next), `go`/`await`. Designs for most of these are in
 [`design/`](design/).

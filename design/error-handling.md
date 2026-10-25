@@ -1,9 +1,12 @@
 # Pin — Error handling
 
-**Status (Pin 0.4, 2026-10-25):** `throws` / `try` / `catch` are **not built yet**. The panic side (E-R6) is
-built: a panic inside an HTTP handler answers 500, frees everything the request allocated, closes its open
-database handles, and the server keeps running. Agreed with the owner on 2026-10-24, replacing the earlier
-default of PHP-style try/catch.
+**Status (Pin 0.6, 2026-10-25):** **built** (E1–E6), with these choices made while building:
+- `try` covers every failing call in its operand; inside `try { } catch` calls need no `try` (PHP style).
+- A catch block in an expression gives its value with a final bare expression (`catch ($e) { "guest"; }`).
+- `catch (Error $e)` / `catch (Exception $e)` are accepted as `catch ($e)`; one catch; no `finally` yet.
+- `__construct` may be `throws`; `new` then needs `try`, and the half-built object is freed on failure.
+- The panic side (E-R6) was built earlier: a panic inside an HTTP handler answers 500, frees everything the
+  request allocated, closes its open database handles, and the server keeps running.
 
 Decision rule: memory safety > speed > clarity > looking like PHP (see `ownership-v2.md`).
 

@@ -1,6 +1,6 @@
 # Writing Pin — guide for AI coding agents
 
-Pin 0.5. Give this file to the agent, or point it at the raw URL:
+Pin 0.6. Give this file to the agent, or point it at the raw URL:
 `https://raw.githubusercontent.com/pin-language/docs/HEAD/ai-guide.md`. It is complete for this version: if a feature is not
 in this file, Pin does not have it yet. Pin looks like PHP 8 but is statically typed and has no garbage
 collector, so a lot of PHP habits do not compile. The compiler explains each error and the fix.
@@ -51,7 +51,8 @@ so fix and re-check. Exit code 0 = ok, 1 = compile error or run-time panic, 2 = 
 9. **Strings copy on `=`** (PHP-like). Join with `.`; `+` on strings is an error.
 10. **No globals.** Pass everything as parameters. Functions may be declared anywhere in the file.
 11. **Non-void functions must return on every path.**
-12. **Missing map key / bad index panic.** Use `isset($m[$k])` or `$m[$k] ?? $default`.
+12. **Missing map key / bad index panic.** Use `isset($m[$k])` or `$m[$k] ?? $default`. Panics are bugs and
+    cannot be caught; expected failures use `throws` / `try` (below).
 13. **A map literal has one value type.** `["a" => 1, "b" => 2.5]` becomes `map<string,float>`;
     `["a" => 1, "b" => "x"]` is an error — for a JSON object with mixed values, use a class and
     `json_encode($obj)` (see Classes).
@@ -61,6 +62,43 @@ so fix and re-check. Exit code 0 = ok, 1 = compile error or run-time panic, 2 = 
 17. **Numbers from text never fail.** `intval("abc")` is 0; a number too big for an int becomes
     `PHP_INT_MAX` / `PHP_INT_MIN` (like PHP), so your range check rejects it. `floatval("2.5kg")` and
     `(float)"2.5"` read the leading number. Always range-check numbers that come from a request.
+
+## Errors: throws / try / catch
+
+```php
+class User { public function __construct(public int $id, public string $name) {} }
+
+function findUser(int $id): User throws {               // can fail: `throws` after the return type
+    if ($id <= 0) { throw error(400, "bad id $id"); }   // error(int $code, string $message)
+    if ($id > 100) { throw error(404, "user $id not found"); }
+    return new User($id, "user$id");
+}
+
+function nameOf(int $id): string throws {
+    $u = try findUser($id);                 // pass the error on: allowed only in a `throws` function
+    return $u->name;
+}
+
+$name = try nameOf(500) catch ($e) { "guest"; };        // handle: the block ends with the value to use
+try {                                                     // several lines, PHP style
+    echo nameOf(7), "\n";
+    echo nameOf(-1), "\n";                               // fails: goes to catch
+} catch ($e) {
+    echo "failed ", $e->code, ": ", $e->message, "\n";   // failed 400: bad id -1
+}
+$u = try findUser(0) catch ($e) { return; };            // ...or the block returns / throws
+```
+
+- **Every call to a `throws` function or method needs `try`** — also as a statement: `try $from->withdraw($n);`.
+  A constructor that can fail is `function __construct(int $start) throws { ... }`; then `try new Account(5)`.
+  Inside `try { ... } catch` the calls need no `try`.
+- A route that matches nothing in a `throws` handler: `throw error(404, "no route $route");`.
+- One error type `Error` (`$e->code`, `$e->message`, `json_encode($e)`); `catch ($e)` / `catch (Error $e)` /
+  `catch (Exception $e)` all work; one catch, no `finally`.
+- Panics (bad index, missing key, division by zero) are not errors and are not caught.
+- An error escaping the top level prints `error: message (code N)` and exits 1.
+- A `serve()` handler may be `: string throws`: an escaping error answers its code (400–599, else 500) with
+  `{"error":"Not Found"}`-style standard text; the message goes only to the log.
 
 ## Classes
 
@@ -220,7 +258,7 @@ function initials(list<string> $names): string {
 HTTP API — GET with a query string, POST with a JSON or form body:
 
 ```php
-function handle(string $method, string $path, string $body): string {   // exactly this signature
+function handle(string $method, string $path, string $body): string {   // exactly this signature (`throws` allowed)
     $route = url_path($path);                       // "/quote?item=cake" -> "/quote"
     if ($method == "GET" && $route == "/health") { return "{\"ok\":true}"; }
     if ($method == "GET" && $route == "/quote") {
@@ -288,7 +326,8 @@ answer from the request.
 | `null`, `?int` | not yet — use `-1`, `""`, empty list, or a separate `bool` |
 | `class`, `new`, `->`, `$this` | the same; no `extends` / `interface` / `static`; objects move on `=` |
 | `function f(array &$a)`, `f($a)` | `function f(list<int> &$a)`, `f(&$a)` — `&` at the call too |
-| `try`/`catch`/`throw` | not yet — check first (`isset`, `??`, range checks) |
+| `throw new InvalidArgumentException("x")` | `throw error(400, "x");` in a function declared `: T throws` |
+| `try { ... } catch (Exception $e) { ... } finally` | the same without `finally`; calls outside it need `try f()` |
 | `switch`, `match` | `if / elseif / else` |
 | `function () {}`, `fn() =>` | named functions |
 | `include`, `use`, `namespace` | `import prices;` (loads prices.pn from the project folder) and `prices::fn()`; mark callable functions `export` |
@@ -309,7 +348,7 @@ answer from the request.
 ## Built-ins (complete list)
 
 <!-- builtins:start (generated by tools/gen_docs.py in the pin repo) -->
-`strlen substr strpos str_contains str_starts_with str_ends_with str_repeat strtolower strtoupper trim explode implode count fill copy sort rsort isset array_key_exists unset intdiv sqrt wrapping_add wrapping_sub wrapping_mul intval floatval strval json_encode json_has json_string json_int json_float json_bool serve http_status url_path query_param query_has form_param form_has db_open db_exec db_query db_next db_int db_float db_string db_is_null db_json db_last_id db_error` · constants `PHP_EOL PHP_INT_MAX PHP_INT_MIN` · casts `(int)` from float/bool/string, `(float)` from int/string, `(string)` from int/float/bool. Details and examples for each: https://github.com/pin-language/docs/blob/HEAD/reference/README.md
+`strlen substr strpos str_contains str_starts_with str_ends_with str_repeat strtolower strtoupper trim explode implode count fill copy sort rsort isset array_key_exists unset intdiv sqrt wrapping_add wrapping_sub wrapping_mul intval floatval strval json_encode json_has json_string json_int json_float json_bool serve http_status url_path query_param query_has form_param form_has db_open db_exec db_query db_next db_int db_float db_string db_is_null db_json db_last_id db_error error` · constants `PHP_EOL PHP_INT_MAX PHP_INT_MIN` · casts `(int)` from float/bool/string, `(float)` from int/string, `(string)` from int/float/bool. Details and examples for each: https://github.com/pin-language/docs/blob/HEAD/reference/README.md
 <!-- builtins:end -->
 
 String functions count bytes (`strlen("ไทย")` is 9). `/` always gives a float; use `intdiv($a, $b)`.
@@ -341,6 +380,10 @@ Ints wrap around on overflow.
 | `X::f() is not exported` | add `export` before `function f` in that file |
 | there is no `import X;` in this file | add `import X;` at the top (each file lists its own imports) |
 | `import X: there is no file X.pn in the project folder` | import paths start at the main file's folder: `import dir/file;` |
+| `f() can fail. Write try f(...)` | `try f()` in a `throws` function, or `try f() catch ($e) { ...; value; }` |
+| `is not declared throws, so try cannot pass the error on` | add `throws` after the return type, or use catch |
+| `this catch block must return, throw, or end with a value` | end the block with a value: `0;` / `"";` |
+| `nothing after this try can fail` | remove `try` (the function is not `throws`) |
 | `may only contain functions, classes and imports` | move top-level code from the imported file into a function or the main file |
 | `import cycle: a.pn -> b.pn -> a.pn` | move what both need into a third file that both import |
 | `is not in pin.lock. Run: pin get ...` | run that `pin get` with a version, e.g. `@v1.0.0` |

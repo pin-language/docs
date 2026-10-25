@@ -40,17 +40,15 @@ Pin knows the PHP features it does not have and says what to use instead:
 
 <!-- check: error -->
 ```php
-try {
-    echo 1;
-} catch (Exception $e) {
-    echo 2;
+switch ($n) {
+    case 1: echo "one";
 }
 ```
 
 Error:
 
 ```text
-example.pn:1: error: try/catch is not in Pin yet (designed: pin-language/docs design/error-handling.md); check values before using them, e.g. isset($m[$k]) or $m[$k] ?? default
+example.pn:1: error: switch is not in Pin; use if / elseif / else
 ```
 
 <!-- check: error -->
@@ -63,6 +61,59 @@ Error:
 ```text
 example.pn:1: error: unknown function str_split(): no str_split() yet: use substr($s, $i, 1) in a loop
 ```
+
+## Errors you expect: throws, try, catch
+
+Some failures are normal: a user that does not exist, input that is not valid. A function that can fail
+says so with `throws` after its return type, and fails with `throw error(code, message)`:
+
+```php
+function findUser(int $id): string throws {
+    if ($id <= 0) { throw error(400, "bad id $id"); }
+    if ($id > 100) { throw error(404, "user $id not found"); }
+    return "user$id";
+}
+
+function greeting(int $id): string throws {
+    $name = try findUser($id);              // fails? pass the error on to my caller
+    return "hello $name";
+}
+
+echo try greeting(7) catch ($e) { "?"; }, "\n";
+echo try greeting(500) catch ($e) { "no luck: " . $e->message; }, "\n";
+```
+
+Output:
+
+```text
+hello user7
+no luck: user 500 not found
+```
+
+Every call to a function that can fail needs `try`, so you can see in the code where things may go wrong:
+
+- `try f()` passes the error on. The function doing this must itself be declared `throws`.
+- `try f() catch ($e) { ...; value; }` handles it. The block ends with the value to use instead, or it
+  returns or throws.
+- `try { ... } catch ($e) { ... }` handles several lines at once, like PHP.
+
+Forgetting `try` does not compile:
+
+<!-- check: error -->
+```php
+function load(): int throws { throw error(500, "disk"); }
+$n = load();
+```
+
+Error:
+
+```text
+example.pn:2: error: load() can fail. Write try load(...), or handle the error: try load(...) catch ($e) { ... }
+```
+
+`$e` is an `Error` with `$e->code` and `$e->message`. There is one error type. Errors are ordinary return
+values under the hood, so they cost almost nothing when nothing fails. An error that escapes the top level
+of the program prints `error: ... (code N)` and exits with 1.
 
 ## Panics
 
@@ -100,8 +151,8 @@ Panic:
 panic: division by zero on line 2
 ```
 
-There is no `try`/`catch` yet, and a panic cannot be caught: check values before you use them. Pin never
-continues with a wrong value — no `null` from a missing key, no warning and carry on.
+A panic is a bug, not an error you expect, so `catch` does not catch it: check values before you use them.
+Pin never continues with a wrong value — no `null` from a missing key, no warning and carry on.
 
 ## Writing code that does not panic
 
@@ -129,8 +180,20 @@ Output:
 
 A panic inside a request handler does not stop the server. That request answers
 `500 {"error":"Internal Server Error"}`, the message goes to the server's terminal, everything the request
-allocated is freed, and the next request is served normally. Validate input and return 400s yourself; save
-500 for real bugs.
+allocated is freed, and the next request is served normally.
+
+A handler may be declared `throws`. An error that leaves it answers with its code (400–599; anything else
+becomes 500), and the body is only the standard text such as `{"error":"Not Found"}`. The message goes to
+the server's log, so internal details never reach the client:
+
+<!-- check: skip -->
+```php
+function handle(string $method, string $path, string $body): string throws {
+    $id = intval(query_param($path, "id"));
+    return json_encode(try findUser($id));   // 404 {"error":"Not Found"} when there is no such user
+}
+serve(8080, "handle");
+```
 
 ## Try it
 
