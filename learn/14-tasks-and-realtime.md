@@ -197,7 +197,9 @@ while (true) {
 
 - `run()` starts a program **without a shell**. Each argument reaches the program exactly as written, so
   message text cannot become a command.
-- `http_stream()` and `http_get()` speak `http://` only for now. For https, put a TLS proxy in front.
+- `http_stream()` and `http_get()` speak `http://` only, by design. To reach an https server, run a small
+  proxy on the same machine (Caddy, see the [language guide](../language.md#http-server)) and call it on
+  `http://127.0.0.1:...`. The proxy opens the https connection.
 
 ## Try it
 

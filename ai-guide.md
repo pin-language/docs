@@ -141,7 +141,8 @@ The top level may use `try` too (`try main();`): an error escaping it prints and
   `try sse_send_id(hub_last_id($inbox), $msg);` / `try sse_comment("ping");` on 504. When the client leaves,
   `hub_next` / `sse_*` fail with 499: return. Resume with
   `hub_resume($topic, intval(request_header("Last-Event-ID")))`.
-- **Calling other servers** (http:// only, no https yet): `try http_get($url, $headers, $ms)`,
+- **Calling other servers** (http:// only, by design — for an https API call a local egress proxy, e.g. Caddy on
+  `http://127.0.0.1:9001` forwarding to `https://api...`; never write `https://` in Pin): `try http_get($url, $headers, $ms)`,
   `try http_post($url, $headers, $body, $ms)` (status ≥ 400 fails with that code; `[]` for no headers);
   streams: `$s = try http_stream($url, $headers, $lastId, $ms); $ev = try stream_next($s, 60000);` — `$lastId`
   0 = no `Last-Event-ID` (a Pin `hub_resume` server then replays what it kept); pass `stream_last_id($s)` when
@@ -371,7 +372,8 @@ value comes from the request, check it first and answer 400 (`str_contains($v, "
 (no globals): compute each answer from the request.
 
 The server closes slow or idle clients by itself (408 / idle close / 503 over 10 000 connections; tune with
-`PN_READ_TIMEOUT_MS`, `PN_IDLE_TIMEOUT_MS`, `PN_WRITE_TIMEOUT_MS`, `PN_MAX_CONNS`). No TLS: use a reverse proxy.
+`PN_READ_TIMEOUT_MS`, `PN_IDLE_TIMEOUT_MS`, `PN_WRITE_TIMEOUT_MS`, `PN_MAX_CONNS`). **No TLS, by design**: a
+reverse proxy / load balancer does https in front of `serve()`.
 
 ## PHP → Pin
 

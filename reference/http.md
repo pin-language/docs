@@ -38,7 +38,7 @@ serve(8080, "handle");
 
 - The handler must be `function NAME(string $method, string $path, string $body): string`; its return value is the response body, sent as `application/json`.
 - One thread per CPU core (`PN_THREADS=n` to change), keep-alive and pipelining. A panic in the handler answers 500 and the server keeps running.
-- No TLS, no request headers and no timeouts yet: for local testing only.
+- Speaks HTTP/1.1 without TLS, by design: put a reverse proxy (Caddy, nginx, a load balancer) in front for https. It has request/response headers, timeouts and connection limits (see the language guide).
 
 ## http_status
 

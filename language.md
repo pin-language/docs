@@ -306,11 +306,32 @@ SQLite's development files (`sudo apt install libsqlite3-dev`).
   Change them with `PN_READ_TIMEOUT_MS`, `PN_IDLE_TIMEOUT_MS`, `PN_WRITE_TIMEOUT_MS`, `PN_MAX_CONNS`.
 - `Transfer-Encoding` (chunked bodies) is refused with 501, and a `Content-Length` that is not plain digits or
   appears twice with different values gets 400, so requests cannot be smuggled past a proxy.
-- No TLS and no HTTP/2: put it behind a reverse proxy (nginx, Caddy) for anything public.
+- No TLS and no HTTP/2, by design ([design/tls.md](design/tls.md)): a proxy does https in both directions —
+  incoming in front of `serve()`, outgoing for `http_get` & co. With Caddy:
+
+```text
+# Caddyfile
+api.example.com {                       # incoming: https for the world, plain http to Pin
+	reverse_proxy 127.0.0.1:8080 {
+		flush_interval -1               # pass Server-Sent Events through at once
+	}
+}
+
+http://127.0.0.1:9001 {                 # outgoing: Pin calls http://127.0.0.1:9001/v1/...
+	bind 127.0.0.1                      # only this machine: otherwise it is an open proxy
+	reverse_proxy https://api.anthropic.com {
+		header_up Host {upstream_hostport}
+		flush_interval -1
+	}
+}
+```
+
+  Headers such as `Authorization` pass through unchanged. (Config written from Caddy's documentation; adjust
+  names and ports.)
 
 ## Not in Pin yet
 
 Inheritance and interfaces, `null` and `?Type`, `finally`, default parameter values,
 closures, sorting with a custom comparison, a full `json_decode`
-(nested objects and arrays), TLS (server and client), databases other than SQLite (PostgreSQL is next), WebSocket. Designs for most of these are in
+(nested objects and arrays), databases other than SQLite (PostgreSQL is next), WebSocket. Designs for most of these are in
 [`design/`](design/).

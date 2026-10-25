@@ -29,7 +29,7 @@ echo $health, "\n";
 (Starts a server; not run in the docs.)
 
 - A status of 400 or more fails with that status as the code (the start of the body is in the message); 502 when the connection fails, 504 when there is no answer within `$ms`.
-- Only `http://` for now (https:// fails with 400): put a TLS proxy next to the program for https.
+- Only `http://`, by design: for an https API, call a local egress proxy (Caddy) on 127.0.0.1 that opens the https connection — see design/tls.md. An https:// URL fails with 400.
 - Header values with CR/LF panic. The name lookup itself still blocks the thread briefly.
 - **PHP:** Instead of `file_get_contents($url)` or curl.
 

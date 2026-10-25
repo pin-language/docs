@@ -4,8 +4,9 @@
 
 A Pin program can be a complete HTTP server: no web server, no PHP-FPM, one native file.
 
-> The server is a preview: no TLS and no HTTP/2. It has timeouts and limits against slow clients, but for
-> anything public put it behind a reverse proxy (nginx, Caddy) that handles TLS.
+> The server is a preview. It speaks HTTP/1.1 without TLS, by design: for anything public, put it behind a
+> reverse proxy or load balancer (Caddy, nginx) that does https. The
+> [language guide](../language.md#http-server) has a Caddy example.
 
 ## The smallest server
 

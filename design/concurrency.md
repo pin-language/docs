@@ -9,7 +9,7 @@
 - C10: instead of `route()` + `Stream`, a handler calls `sse_start()` / `sse_send()`; the client leaving
   makes the next wait or send fail with 499.
 - The Hub's `next()` became `hub_next($sub, $ms)` with a required time limit. Client side (`http_*`,
-  `run`) is http:// only; TLS is a later decision.
+  `run`) is http:// only; TLS is done by a proxy ([tls.md](tls.md), decided 2026-10-25).
 
 Decision rule: memory safety > speed > clarity > looking like PHP.
 
