@@ -12,7 +12,7 @@ every web app needs, framework or not.
 
 | # | what | why it blocks Tack |
 |---|---|---|
-| P1 | **resources that outlive a request** — a database connection pool (per worker thread, so no locks: tasks never leave their thread) | no globals means a new connection per request; fine for SQLite, far too slow for PostgreSQL |
+| P1 | **resources that outlive a request** ([pool.md](pool.md)) — a database connection pool (per worker thread, so no locks: tasks never leave their thread) | no globals means a new connection per request; fine for SQLite, far too slow for PostgreSQL |
 | P2 | `json_decode` into a class | T3 validation, T8 typed client calls, class return values |
 | P3 | `null` (null.md) and parameter defaults | optional query values and JSON fields |
 | P4 | PostgreSQL on the pool, plus a safe way to build queries with optional filters and sorting | the literal-SQL rule allows no search/filter endpoints today; T7's build-time check only covers SQLite |
