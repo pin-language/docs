@@ -1,8 +1,13 @@
 # Pin — Database connections that outlive a request (pool)
 
-**Status (2026-10-25):** design draft, **nothing built**. Prerequisite P1 for the web framework
-([tack.md](tack.md)) and for PostgreSQL (HANDOFF §4 item 7). Decisions below are made by the rule; the open
-questions at the end are for the owner.
+**Status (2026-10-26):** **built for SQLite** (K1–K5) on `next`, not released. Prerequisite P1 for the web
+framework ([tack.md](tack.md)) and for PostgreSQL. Differences from the text below, made while building:
+- K5: when the pool stays full for 5 s, `db_open()` **panics** (500 in a handler), not 503: `db_open` does not
+  `throws`, and making it so would change every program. Waiting polls every 2 ms (yields to other tasks).
+- K6 (statement cache) is **not built**: the pool alone gave ~7×; measure again before adding it.
+- `":memory:"`, `""` and `mode=memory` URIs are never pooled (each open must be a new, empty database).
+- K4 for SQLite allows PRAGMAs that only read or that change the file (`table_info(t)`, `user_version = 3`, …).
+- Measured after building (same setup as step 0): 181k–189k req/s, was 24.6k–26.0k.
 
 Decision rule: memory safety > speed > clarity > looking like PHP.
 
