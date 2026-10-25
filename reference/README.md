@@ -26,7 +26,7 @@ New to Pin? Start with the [language guide](../language.md). Writing Pin with an
 
 ## [HTTP](http.md)
 
-[`serve`](http.md#serve), [`http_status`](http.md#http_status), [`request_header`](http.md#request_header), [`request_has_header`](http.md#request_has_header), [`response_header`](http.md#response_header), [`url_path`](http.md#url_path), [`query_param`](http.md#query_param), [`query_has`](http.md#query_has), [`form_param`](http.md#form_param), [`form_has`](http.md#form_has)
+[`serve`](http.md#serve), [`http_status`](http.md#http_status), [`request_header`](http.md#request_header), [`request_has_header`](http.md#request_has_header), [`response_header`](http.md#response_header), [`url_path`](http.md#url_path), [`query_param`](http.md#query_param), [`query_has`](http.md#query_has), [`form_param`](http.md#form_param), [`form_has`](http.md#form_has), [`sse_start`](http.md#sse_start), [`sse_send`](http.md#sse_send), [`sse_send_id`](http.md#sse_send_id), [`sse_comment`](http.md#sse_comment)
 
 ## [Database (SQLite)](database.md)
 
@@ -35,3 +35,15 @@ New to Pin? Start with the [language guide](../language.md). Writing Pin with an
 ## [Errors](errors.md)
 
 [`error`](errors.md#error)
+
+## [Tasks (go / await)](tasks.md)
+
+[`sleep_ms`](tasks.md#sleep_ms), [`await_all`](tasks.md#await_all), [`await_timeout`](tasks.md#await_timeout)
+
+## [Hub (messages between requests)](hub.md)
+
+[`hub_publish`](hub.md#hub_publish), [`hub_subscribe`](hub.md#hub_subscribe), [`hub_resume`](hub.md#hub_resume), [`hub_next`](hub.md#hub_next), [`hub_last_id`](hub.md#hub_last_id)
+
+## [Other servers and programs](client.md)
+
+[`http_get`](client.md#http_get), [`http_post`](client.md#http_post), [`http_stream`](client.md#http_stream), [`stream_next`](client.md#stream_next), [`stream_last_id`](client.md#stream_last_id), [`run`](client.md#run)

@@ -1,6 +1,6 @@
 # Writing Pin — guide for AI coding agents
 
-Pin 0.6. Give this file to the agent, or point it at the raw URL:
+Pin 0.7. Give this file to the agent, or point it at the raw URL:
 `https://raw.githubusercontent.com/pin-language/docs/HEAD/ai-guide.md`. It is complete for this version: if a feature is not
 in this file, Pin does not have it yet. Pin looks like PHP 8 but is statically typed and has no garbage
 collector, so a lot of PHP habits do not compile. The compiler explains each error and the fix.
@@ -100,6 +100,54 @@ $u = try findUser(0) catch ($e) { return; };            // ...or the block retur
 - A `serve()` handler may be `: string throws`: an escaping error answers its code (400–599, else 500) with
   `{"error":"Not Found"}`-style standard text, without the headers set before it; the message goes only to
   the log. For a custom error body, catch it and return your own JSON with `http_status()`.
+
+## Tasks: go / await, Hub, streams
+
+```php
+function lookup(int $id): string throws {
+    sleep_ms(50);                                   // waits without holding the thread (milliseconds!)
+    if ($id < 0) { throw error(404, "no user $id"); }
+    return "user$id";
+}
+
+$a = go lookup(1);                                  // starts at once; $a is a Task<string>
+$b = go lookup(2);
+echo try await $a, " ", try await $b, "\n";       // both ran at the same time: ~50 ms, not 100
+
+list<Task<string>> $ts = [];
+foreach ([3, 4, 5] as $id) { $ts[] = go lookup($id); }
+$names = try await_all($ts);                        // list<string>, in order
+$t = go lookup(6);
+$n = try await_timeout($t, 20) catch ($e) { "too slow"; };   // cancels the task, 504
+```
+
+A catch block's value is its **last line, outside any if**: `catch ($e) { if ($e->code != 504) { return ""; } "fallback"; }`.
+The top level may use `try` too (`try main();`): an error escaping it prints and exits 1.
+
+- **Every task is awaited** (`await $t`, or `await_all($list)` for a list) before the function that started it
+  returns — forgetting is a compile error. A task gives its result once. `Task<T>` lives only in local
+  variables and lists (not parameters, returns, properties, maps).
+- A task **borrows** its arguments until the await: changing them before is a compile error. `go f(&$x)` lends
+  `$x` for changing: no other use of `$x` until the await. Pass `copy($x)` to give a task its own.
+- `go` starts your functions (not built-ins or methods): wrap a method call in a function.
+- Calls to a `throws` function through a task need `try await`.
+- **Hub** — the only way requests talk to each other (no globals):
+  `hub_publish($topic, $text)`; `$s = hub_subscribe($topic)`; `$m = try hub_next($s, 25000)` (504 when nothing
+  came in time — the limit is required); `hub_resume($topic, $lastId)` also replays the last kept messages
+  (100 per topic) after `$lastId`; `hub_last_id($s)`. Messages are in memory only: store what must survive
+  (SQLite) and use the Hub to wake readers.
+- **Long-poll** in a handler: subscribe, `try hub_next($inbox, 25000) catch ($e) { http_status(204); return ""; }`.
+- **Server-Sent Events** in a `throws` handler: `try sse_start();` then loop
+  `try sse_send_id(hub_last_id($inbox), $msg);` / `try sse_comment("ping");` on 504. When the client leaves,
+  `hub_next` / `sse_*` fail with 499: return. Resume with
+  `hub_resume($topic, intval(request_header("Last-Event-ID")))`.
+- **Calling other servers** (http:// only, no https yet): `try http_get($url, $headers, $ms)`,
+  `try http_post($url, $headers, $body, $ms)` (status ≥ 400 fails with that code; `[]` for no headers);
+  streams: `$s = try http_stream($url, $headers, $lastId, $ms); $ev = try stream_next($s, 60000);` — `$lastId`
+  0 = no `Last-Event-ID` (a Pin `hub_resume` server then replays what it kept); pass `stream_last_id($s)` when
+  reconnecting. With SSE, send `hub_last_id($inbox)` as the id: `try sse_send_id(hub_last_id($inbox), $msg);`.
+- **Running a program**: `try run("git", ["log", "-1"], 5000)` returns stdout. No shell: arguments are passed
+  as they are (safe with request text). Non-zero exit fails with the exit code; too slow → 504 (killed).
 
 ## Classes
 
@@ -352,13 +400,17 @@ The server closes slow or idle clients by itself (408 / idle close / 503 over 10
 | `(bool)$x`, truthiness | compare explicitly |
 | `$s + 1` on strings | `intval($s) + 1` |
 | `list($a, $b) = ...` | assign separately |
+| `sleep(1)`, `usleep()` | `sleep_ms(1000)` (milliseconds; does not block other tasks) |
+| `exec()`, `shell_exec()`, `proc_open()` | `try run("prog", ["arg"], 5000)` — no shell |
+| `file_get_contents("http://...")`, curl | `try http_get($url, [], 5000)` (http:// only) |
+| Swoole / ReactPHP coroutines, `Promise` | `$t = go f(); ... try await $t;` |
 | `foreach ($xs as &$x)` | the same (not for bools); the `&` variable is gone after the loop |
 | default parameter values `int $n = 1` | not yet — pass every argument |
 
 ## Built-ins (complete list)
 
 <!-- builtins:start (generated by tools/gen_docs.py in the pin repo) -->
-`strlen substr strpos str_contains str_starts_with str_ends_with str_repeat strtolower strtoupper trim explode implode count fill copy sort rsort isset array_key_exists unset intdiv sqrt wrapping_add wrapping_sub wrapping_mul intval floatval strval json_encode json_has json_string json_int json_float json_bool serve http_status request_header request_has_header response_header url_path query_param query_has form_param form_has db_open db_exec db_query db_next db_int db_float db_string db_is_null db_json db_last_id db_error error` · constants `PHP_EOL PHP_INT_MAX PHP_INT_MIN` · casts `(int)` from float/bool/string, `(float)` from int/string, `(string)` from int/float/bool. Details and examples for each: https://github.com/pin-language/docs/blob/HEAD/reference/README.md
+`strlen substr strpos str_contains str_starts_with str_ends_with str_repeat strtolower strtoupper trim explode implode count fill copy sort rsort isset array_key_exists unset intdiv sqrt wrapping_add wrapping_sub wrapping_mul intval floatval strval json_encode json_has json_string json_int json_float json_bool serve http_status request_header request_has_header response_header url_path query_param query_has form_param form_has db_open db_exec db_query db_next db_int db_float db_string db_is_null db_json db_last_id db_error error sleep_ms await_all await_timeout hub_publish hub_subscribe hub_resume hub_next hub_last_id sse_start sse_send sse_send_id sse_comment http_get http_post http_stream stream_next stream_last_id run` · constants `PHP_EOL PHP_INT_MAX PHP_INT_MIN` · casts `(int)` from float/bool/string, `(float)` from int/string, `(string)` from int/float/bool. Details and examples for each: https://github.com/pin-language/docs/blob/HEAD/reference/README.md
 <!-- builtins:end -->
 
 String functions count bytes (`strlen("ไทย")` is 9). `/` always gives a float; use `intdiv($a, $b)`.
@@ -394,6 +446,11 @@ Ints wrap around on overflow.
 | `is not declared throws, so try cannot pass the error on` | add `throws` after the return type, or use catch |
 | `this catch block must return, throw, or end with a value` | end the block with a value: `0;` / `"";` |
 | `nothing after this try can fail` | remove `try` (the function is not `throws`) |
+| `the task in $t ... is not awaited` | `await $t` (or `await_all($ts)`) before the function returns |
+| `the task in $t ... reads it until it is awaited` | change it after the await, or pass `copy()` to the task |
+| `is lent with & to the task` | use it after `await` |
+| `hub_next() can fail` / `run() can fail` / `http_get() can fail` | `try ...` or `try ... catch ($e) { ...; value; }` |
+| `a task started with go must be kept in a variable` | `$t = go f();` or `await go f()` |
 | `may only contain functions, classes and imports` | move top-level code from the imported file into a function or the main file |
 | `import cycle: a.pn -> b.pn -> a.pn` | move what both need into a third file that both import |
 | `is not in pin.lock. Run: pin get ...` | run that `pin get` with a version, e.g. `@v1.0.0` |

@@ -1,6 +1,6 @@
-# The Pin language guide (0.6)
+# The Pin language guide (0.7)
 
-Pin reads like PHP 8 and compiles to a native binary. This guide covers everything the 0.6 compiler
+Pin reads like PHP 8 and compiles to a native binary. This guide covers everything the 0.7 compiler
 accepts. Anything not listed here is not supported yet.
 
 ## Files and running
@@ -259,6 +259,23 @@ serve(8080, "handle");
   `Content-Type` replaces the default). A value with CR/LF or another control byte panics, so request data
   cannot inject headers; `Content-Length`, `Connection`, `Transfer-Encoding` and `Date` belong to the server.
 
+## Tasks (go / await), the Hub, streams
+
+- `$t = go f(args);` starts a task; `await $t` gives its result (`try await $t` when `f` is `throws`);
+  `await_all($list)` for a `list<Task<T>>`; `try await_timeout($t, $ms)` cancels after `$ms` (504).
+  `sleep_ms($ms)` waits. A task runs on the thread that started it; tasks take turns, so there are no data
+  races.
+- Rules (checked when compiling): every task is awaited before the function that started it returns; a task
+  borrows its arguments until then (they cannot change); `go f(&$x)` lends `$x` exclusively until the await;
+  `Task<T>` only in local variables and lists. `go` starts your functions (not built-ins, not methods).
+- On an error or panic exit, unawaited tasks are waited for (and freed) before the function's values go.
+  Cancelling is cooperative: a cancelled task's waits end at once.
+- In a server every request is a task: a handler that waits does not block other requests.
+- Hub: `hub_publish`, `hub_subscribe`, `hub_resume`, `hub_next($s, $ms)` (time limit required; 504 / 507 /
+  499), `hub_last_id`. Server-Sent Events from a handler: `sse_start`, `sse_send`, `sse_send_id`, `sse_comment`.
+- Other servers and programs: `http_get`, `http_post`, `http_stream` + `stream_next` / `stream_last_id`
+  (http:// only), `run($program, $args, $ms)` (no shell). See [Learn chapter 14](learn/14-tasks-and-realtime.md).
+
 ## Modules and packages
 
 Each `.pn` file is a module. `import prices;` loads `prices.pn` from the project folder (the main file's
@@ -295,5 +312,5 @@ SQLite's development files (`sudo apt install libsqlite3-dev`).
 
 Inheritance and interfaces, `null` and `?Type`, `finally`, default parameter values,
 closures, sorting with a custom comparison, a full `json_decode`
-(nested objects and arrays), TLS, databases other than SQLite (PostgreSQL is next), `go`/`await`. Designs for most of these are in
+(nested objects and arrays), TLS (server and client), databases other than SQLite (PostgreSQL is next), WebSocket. Designs for most of these are in
 [`design/`](design/).

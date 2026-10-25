@@ -14,6 +14,10 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`query_has`](#query_has) | Whether the query string has `$key`, even with an empty value. |
 | [`form_param`](#form_param) | One value from a form body (`a=1&b=2`), decoded, or `""`. |
 | [`form_has`](#form_has) | Whether a form body has `$key`. |
+| [`sse_start`](#sse_start) | Turn the response into a Server-Sent Events stream (`text/event-stream`), sent as it is written. |
+| [`sse_send`](#sse_send) | Send one event (`data:` lines; a newline in the text starts a new line). |
+| [`sse_send_id`](#sse_send_id) | Send one event with an id; a reconnecting browser sends it back as the `Last-Event-ID` header. |
+| [`sse_comment`](#sse_comment) | Send a comment line (`: text`): clients ignore it; it keeps an idle stream from being closed. |
 
 ## serve
 
@@ -220,3 +224,93 @@ Output:
 ```
 yn
 ```
+
+## sse_start
+
+```php
+sse_start(): void throws
+```
+
+Turn the response into a Server-Sent Events stream (`text/event-stream`), sent as it is written.
+
+```php
+function handle(string $method, string $path, string $body): string throws {
+    $inbox = hub_subscribe("news");
+    try sse_start();
+    while (true) {
+        $m = try hub_next($inbox, 25000) catch ($e) {
+            if ($e->code != 504) { return ""; }   // the client left
+            try sse_comment("ping");             // keeps proxies from closing a quiet stream
+            continue;
+        };
+        try sse_send($m);
+    }
+}
+serve(8080, "handle");
+```
+
+(Starts a server; not run in the docs.)
+
+- Headers set with `response_header()` before it are sent. The stream ends when the handler returns; the connection then closes.
+- When the client leaves, the next `sse_*` call (or `hub_next`) fails with 499, so the handler ends and its subscription is closed.
+
+## sse_send
+
+```php
+sse_send(string $data): void throws
+```
+
+Send one event (`data:` lines; a newline in the text starts a new line).
+
+```php
+function handle(string $method, string $path, string $body): string throws {
+    try sse_start();
+    try sse_send(json_encode(["n" => 1]));
+    return "";
+}
+serve(8080, "handle");
+```
+
+(Starts a server; not run in the docs.)
+
+- Fails with 499 when the client is gone, 503 when it reads too slowly (over 1 MB waiting).
+
+## sse_send_id
+
+```php
+sse_send_id(int $id, string $data): void throws
+```
+
+Send one event with an id; a reconnecting browser sends it back as the `Last-Event-ID` header.
+
+```php
+function handle(string $method, string $path, string $body): string throws {
+    try sse_start();
+    $inbox = hub_resume("news", intval(request_header("Last-Event-ID")));
+    $msg = try hub_next($inbox, 25000);
+    try sse_send_id(hub_last_id($inbox), $msg);
+    return "";
+}
+serve(8080, "handle");
+```
+
+(Starts a server; not run in the docs.)
+
+## sse_comment
+
+```php
+sse_comment(string $text): void throws
+```
+
+Send a comment line (`: text`): clients ignore it; it keeps an idle stream from being closed.
+
+```php
+function handle(string $method, string $path, string $body): string throws {
+    try sse_start();
+    try sse_comment("ping");
+    return "";
+}
+serve(8080, "handle");
+```
+
+(Starts a server; not run in the docs.)

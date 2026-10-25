@@ -1,10 +1,15 @@
 # Pin — Concurrency
 
-**Status (Pin 0.5, 2026-10-25):** **not built yet.** Today the only parallelism is the HTTP server, which runs
-one handler per CPU core with no shared state. Agreed with the owner on 2026-10-24, replacing the earlier
-decision 3A (Go-style goroutines) with **structured `go` + `await`**. Prerequisites already built: the macOS
-event loop (kqueue), per-path analysis (`class Flow`), panic → 500 with per-request cleanup. Still needed
-first: `throws` / `try` (`error-handling.md`).
+**Status (Pin 0.7, 2026-10-25):** **built**, C1–C11, with these choices made while building:
+- Tasks run only on the OS thread that started them (no work stealing): no data races even inside the
+  runtime. Context switch in assembly (aarch64, x86_64); 1 MB stacks with a guard page (overflow crashes,
+  it does not yet turn into a panic message).
+- Cancelling is cooperative and only at waits (`sleep_ms`, `hub_next`, sockets, `run`); there is no
+  loop-head check yet. An error exit waits for unawaited tasks instead of cancelling them.
+- C10: instead of `route()` + `Stream`, a handler calls `sse_start()` / `sse_send()`; the client leaving
+  makes the next wait or send fail with 499.
+- The Hub's `next()` became `hub_next($sub, $ms)` with a required time limit. Client side (`http_*`,
+  `run`) is http:// only; TLS is a later decision.
 
 Decision rule: memory safety > speed > clarity > looking like PHP.
 

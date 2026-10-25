@@ -1,6 +1,6 @@
 # 13. Classes
 
-[Learn Pin](README.md) · previous: [12. Modules and packages](12-modules-and-packages.md)
+[Learn Pin](README.md) · previous: [12. Modules and packages](12-modules-and-packages.md) · next: [14. Tasks and real time](14-tasks-and-realtime.md)
 
 A class groups related values (its **properties**) together with the functions that work on them (its
 **methods**). Pin writes classes the way PHP 8 does. The difference: an object is a **value with one owner**,
