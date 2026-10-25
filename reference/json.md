@@ -9,6 +9,7 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`json_len`](#json_len) | The number of items of a JSON array (or keys of an object); -1 when the text is neither. |
 | [`json_at`](#json_at) | The JSON text of item `$i` (from 0) of a JSON array, or `""` when there is no such item. |
 | [`json_has`](#json_has) | Whether a JSON object has a top-level key. |
+| [`json_decode`](#json_decode) | Build an object of a class from JSON text, checking every field. |
 | [`json_string`](#json_string) | A top-level string value, or `""`. |
 | [`json_int`](#json_int) | A top-level integer value, or 0. |
 | [`json_float`](#json_float) | A top-level number as a float, or 0.0. |
@@ -130,6 +131,39 @@ yynn
 ```
 
 - True even when the value is `null`. False when the text is not a JSON object.
+
+## json_decode
+
+```php
+json_decode(string $json): T throws
+```
+
+Build an object of a class from JSON text, checking every field.
+
+```php
+class Order {
+    public function __construct(public string $item, public int $qty) throws {
+        if ($qty < 1 || $qty > 100) { throw error(400, "qty must be 1-100"); }
+    }
+}
+Order $o = try json_decode("{\"item\":\"tea\",\"qty\":2}");
+echo $o->item, " x", $o->qty, "\n";
+Order $bad = try json_decode("{\"item\":\"tea\",\"qty\":\"2\"}") catch ($e) { echo $e->code, " ", $e->message, "\n"; return; };
+```
+
+Output:
+
+```
+tea x2
+400 $.qty: want an integer, got a string
+```
+
+- The class comes from where the value goes: `Order $o = try json_decode($body);`, or `return try json_decode($body);` in a function declared `: Order throws`. The top level must be a JSON object.
+- Strict: a missing field, an unknown field, a field given twice, a wrong type (`"2"` for an int, `1.5` for an int, `null`), invalid JSON or nesting deeper than 64 levels fail with `error(400, "<path>: <what>")`, e.g. `$.lines[1].qty: want an integer, got a string`. Every public field must be there (optional fields come with `null`, which Pin does not have yet).
+- A class with `__construct` is built by calling it with the JSON fields named like its parameters, so its checks run (throw `error(400, ...)` there). A class without one gets its public properties filled.
+- Fields may be int, float (an integer is accepted), bool, string, other classes, `list<T>` and `map<string,T>` of those, nested to any depth. `map<int,...>` does not compile (JSON keys are strings).
+- Inside a `throws` handler an escaping 400 answers `{"error":"Bad Request"}` without the message; catch it to send the message: `try json_decode($body) catch ($e) { http_status(400); return json_encode(["error" => $e->message]); }`.
+- **PHP:** PHP's `json_decode()` gives an untyped array/stdClass and checks nothing; Pin's builds your class and checks it (like a typed DTO / Pydantic model).
 
 ## json_string
 
