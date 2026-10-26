@@ -1,6 +1,6 @@
 # Tack — the web framework for Pin
 
-**Status (2026-10-26):** **M1 built** in github.com/pin-language/tack (package `tack.pn`, the `tack`
+**Status (2026-10-26):** **M1 and M3 built** in github.com/pin-language/tack (package `tack.pn`, the `tack`
 command, `examples/shop`, CI on Linux and macOS); needs Pin from `next`. Prerequisites P1, P2, P5 and
 parameter defaults are built (table below); null and the PostgreSQL driver are not. Open questions for the
 owner are in the last section.
@@ -16,6 +16,11 @@ owner are in the last section.
   the dispatcher with headers from the test (`tack::Req` reads real headers only in a live server).
 - Not in M1: guards (every route is public until M3 — T4's deny-by-default arrives with them), `HEAD` /
   `OPTIONS` (405), CORS settings, `stream`, deadlines, OpenAPI/MCP. Path values are not percent-decoded.
+- **M3 as built:** T4 as written — `_guard.pn` per folder, nearest wins, a route no guard covers does not
+  build, the guard's return type is what a route may ask for (asking for another folder's type does not
+  build). The guard runs before any value is read (401 before 400). `tack::api_key()` (unset or < 16 chars →
+  500, never open), sessions in SQLite storing only SHA-256 of a 256-bit token, expiry by SQLite's clock (Pin
+  has none). Not yet: cookies, CSRF, rate limits.
 - Speed gate, measured: `GET /` through Tack 221k–277k req/s vs a hand-written `serve()` 220k–260k (M2, load
   generator on the same machine): no difference beyond the noise.
 
