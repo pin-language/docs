@@ -1,6 +1,6 @@
 # Tack — the web framework for Pin
 
-**Status (2026-11-08):** **M1, M2 and M3 built** in github.com/pin-language/tack (package `tack.pn`, the `tack`
+**Status (2026-11-08):** **M1, M2, M3 and M6 built** in github.com/pin-language/tack (package `tack.pn`, the `tack`
 command, `examples/shop`, CI on Linux and macOS); needs Pin from `next`. Prerequisites P1, P2, P5 and
 parameter defaults are built (table below); null and the PostgreSQL driver are not. Open questions for the
 owner are in the last section.
@@ -25,6 +25,12 @@ owner are in the last section.
   input schema follows json_decode (constructor parameters, defaults optional, `additionalProperties:
   false`), the output schema follows json_encode (public properties); security is read from the guard's
   source (`tack::api_key` → apiKey header, sessions → bearer). Validated in CI with openapi-spec-validator.
+- **M6 as built:** opt-in `{"mcp": true}` in tack.json (Q4 answered: off by default). Streamable HTTP at
+  `POST /_tack/mcp` (2025-06-18 / 2025-03-26, JSON answers, no SSE stream, no sessions), behind the root
+  guard. Tools come from the OpenAPI document (one per operation, body under `body`, `$defs` inlined);
+  `tools/call` re-enters the dispatcher with the caller's headers, so guards apply per tool; 4xx/5xx →
+  `isError: true` with the route's message. `Origin` refused unless listed (DNS rebinding). Checked in CI with
+  the official MCP Python SDK. tack.json may set `"name"`. Needed Pin's new `rawurlencode()`.
 - Speed gate, measured: `GET /` through Tack 221k–277k req/s vs a hand-written `serve()` 220k–260k (M2, load
   generator on the same machine): no difference beyond the noise.
 
