@@ -1,10 +1,9 @@
 # Pin — PostgreSQL (P4)
 
-**Status (2026-10-26):** design draft. **Built:** G6 (SQL variables built from literals, for SQLite now) and
-`env()` (G7's built-in; the compile error for `postgres://` literals comes with PostgreSQL). Not built: G1–G5. Prerequisite P4 for the web framework
-([tack.md](tack.md)); builds on the connection pool ([pool.md](pool.md)). Decisions are made by the rule;
-open questions for the owner are at the end. Checked on the owner's Mac: PostgreSQL 16.14 and libpq are
-installed (Homebrew), so this can be built and tested locally.
+**Status (2026-11-08): built** (G1–G7). Prerequisite P4 for the web framework ([tack.md](tack.md)); builds on
+the connection pool ([pool.md](pool.md)). The owner answered "PostgreSQL" with the proposed answers to Q1–Q3
+(TLS through libpq: yes; `db_open` of a server that is down: panic for now; G6: yes). How it was built and
+what differs from the draft: **As built** at the end.
 
 Decision rule: memory safety > speed > clarity > looking like PHP.
 
@@ -99,3 +98,36 @@ program is a compile error ("read it with env(\"DATABASE_URL\")"), so passwords 
 - **Q2** `db_open()` of a server that is down panics (500), like SQLite's open failure. With a network database
   this is normal operation, so it could be `throws` (503). Proposed: keep panic for now, revisit with Tack.
 - **Q3** G6 changes what compiles (more programs are accepted, none rejected). Proposed: yes.
+
+## As built (2026-11-08)
+
+- **libpq is loaded with `dlopen`, not linked** (changes G1). The URL comes from `env()` at run time, so the
+  compiler cannot see which programs open PostgreSQL; linking `-lpq` into every database program would make
+  SQLite-only programs need libpq installed. `runtime/postgres.c` declares the 26 libpq functions it uses
+  and loads `libpq.so.5` / `libpq.5.dylib` (plus Homebrew's keg paths, or `PIN_LIBPQ`) the first time a
+  `postgres://` database is opened. Missing library = a panic that says how to install it. No build-time
+  headers are needed.
+- **G2** as designed: `PQconnectStart`/`PQconnectPoll` (10 s limit), `PQsendQueryParams`, `PQflush`,
+  `PQconsumeInput`/`PQisBusy`, with `wait_fds()`. Measured on one thread: 4 requests running `pg_sleep(0.4)`
+  finish together in 0.42 s (not 1.6 s). A wait cut by `request_deadline(100)` answers 504 after ~104 ms; the
+  connection is closed, not pooled. The server keeps running a cancelled query until it ends (libpq's cancel
+  call blocks; not used) — put `statement_timeout` in the URL (`?options=-c%20statement_timeout%3D5000`) for
+  long queries.
+- **G3** at run time for every query (the database is chosen at run time): `?` outside `'...'`, `"..."`,
+  `--`, `/* */` and `$tag$...$tag$` becomes `$n`. PostgreSQL's JSON operators `?`, `?|`, `?&` therefore
+  cannot be written; use `jsonb_exists()` / `jsonb_exists_any()` / `jsonb_exists_all()`.
+- **G4**: both rule sets (SQLite's and PostgreSQL's) apply to every `db_*` call. Added to the draft's list:
+  `LOAD`, `set_config(..., false)` and the session advisory locks (`pg_advisory_lock`, `pg_try_advisory_lock`,
+  `_shared`), which would stay with the pooled connection. `SET LOCAL`, `SET TRANSACTION`, `SET CONSTRAINTS`
+  are allowed. The `max_connections` check runs once, at the first connection: a warning when threads × per
+  thread > `max_connections` − 3.
+- **G5**: results are read whole (`PQgetResult`), so a `rows` never holds the connection (closing `$db` first
+  is safe, as with SQLite). A constraint error in `db_query` (e.g. `INSERT ... RETURNING`) panics like SQLite;
+  the documented way to insert-unless-exists is `ON CONFLICT DO NOTHING RETURNING id`. `db_error()` is the
+  server's one-line message (it names the constraint, not the value); panics add the DETAIL line.
+  NOTICEs are dropped, WARNINGs printed on one line.
+- Passwords are replaced by `***` in every message that shows the URL.
+- Tests: `tests/pg/` (programs and panics) and `tests/server/pg.pn` run when `PIN_TEST_POSTGRES` is set —
+  in CI on Linux (a `postgres:16` service) and macOS (Homebrew), under ASAN + UBSAN too.
+- Not done: Tack's build-time SQL check (`tack check`) still knows only SQLite; cancelling the server-side
+  query; binary results; `LISTEN`/`NOTIFY` (would need a connection outside the pool).

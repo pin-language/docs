@@ -4,8 +4,8 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 
 | | |
 |---|---|
-| [`db_open`](#db_open) | Open (or create) an SQLite database file. |
-| [`db_pool`](#db_pool) | Set the connection pool for one database file (optional). |
+| [`db_open`](#db_open) | Open (or create) an SQLite database file, or a PostgreSQL database by URL. |
+| [`db_pool`](#db_pool) | Set the connection pool for one database file or PostgreSQL URL (optional). |
 | [`db_exec`](#db_exec) | Run INSERT, UPDATE, DELETE or CREATE; returns the rows changed. |
 | [`db_query`](#db_query) | Run a SELECT and get the rows one at a time. |
 | [`db_next`](#db_next) | Move to the next row; false when there are no more. |
@@ -23,7 +23,7 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 db_open(string $path): db
 ```
 
-Open (or create) an SQLite database file.
+Open (or create) an SQLite database file, or a PostgreSQL database by URL.
 
 ```php
 $db = db_open(":memory:");          // a file name like "shop.db", or ":memory:" for a temporary one
@@ -41,8 +41,10 @@ Output:
 - `:memory:` and `""` are never pooled: each open is a new, empty database.
 - A file that cannot be opened panics. Foreign keys are enforced.
 - `db` values move like lists; pass `$db` to functions (they borrow it). A task (`go`) cannot use the caller's `$db`: open one inside the task.
-- SQL that would change the connection for its next user (`PRAGMA foreign_keys = ...`, `ATTACH`, `CREATE TEMP ...`) does not compile.
-- **PHP:** Pin's version of `new PDO('sqlite:shop.db')`. PostgreSQL is planned with the same functions.
+- SQL that would change the connection for its next user (`PRAGMA foreign_keys = ...`, `ATTACH`, `CREATE TEMP ...`; for PostgreSQL `SET` without `LOCAL`, `RESET`, `LISTEN`, `PREPARE`, `DISCARD`, `set_config(..., false)`, `pg_advisory_lock()`) does not compile.
+- PostgreSQL: `db_open(env("DATABASE_URL"))` with `postgres://user:password@host:5432/name` (or `postgresql://`). The same `db_*` functions and `?` placeholders work; the URL as a literal in the code does not compile, so the password stays out of git. It needs PostgreSQL's client library at run time (Ubuntu/Debian `libpq5`, macOS `brew install libpq`); TLS options go in the URL (`?sslmode=require`).
+- PostgreSQL waits never block the thread: while one request waits for the database, the others run. A server that is down panics (500) after up to 10 s.
+- **PHP:** Pin's version of `new PDO('sqlite:shop.db')` / `new PDO('pgsql:...')`.
 
 ## db_pool
 
@@ -50,7 +52,7 @@ Output:
 db_pool(string $path, int $per_thread, int $idle_ms): void
 ```
 
-Set the connection pool for one database file (optional).
+Set the connection pool for one database file or PostgreSQL URL (optional).
 
 ```php
 db_pool("shop.db", 8, 30000);    // up to 8 connections per server thread; close after 30 s unused
@@ -66,6 +68,7 @@ pool set
 - Without it each file gets 4 connections per thread, closed after 60 s unused.
 - Only at the top level of the program, before `serve()` (compile error inside a function).
 - When a thread's connections are all in use, `db_open()` waits (other requests keep running) for up to 5 seconds, then panics — a 500 inside a handler. A handler holds a connection while it waits (`sleep_ms`, `await`, `http_get`), so raise the limit for handlers like that.
+- PostgreSQL: threads × `$per_thread` must stay under the server's `max_connections` (100 by default); the program prints a warning at the first connection when it does not.
 - **PHP:** Like `PDO::ATTR_PERSISTENT` / `pg_pconnect`, but the connection is always returned clean.
 
 ## db_exec
@@ -91,7 +94,7 @@ Output:
 
 - The SQL must be a string literal in your code; every value goes in a `?` placeholder and in the list (`list<string>`, `list<int>` or `list<float>`). SQL built from variables does not compile, so a client cannot inject SQL.
 - Returns -1 when a constraint (UNIQUE, NOT NULL, CHECK, FOREIGN KEY) refuses the change — `db_error($db)` says which. Any other error (bad SQL, wrong number of values) is a bug and panics.
-- One statement per call. Numbers can be passed as strings: SQLite stores `"2"` in an INTEGER column as 2.
+- One statement per call. Numbers can be passed as strings: SQLite stores `"2"` in an INTEGER column as 2, and PostgreSQL reads each value as the type its column or `?::type` asks for.
 
 ## db_query
 
@@ -167,6 +170,7 @@ Output:
 ```
 
 - A column name the query does not have, or reading before `db_next`, panics. Use `AS name` for computed columns.
+- PostgreSQL: strict — a value that is not a whole integer (`"12abc"`, `1.5`) panics; a `bool` column gives 1 or 0.
 
 ## db_float
 
@@ -211,6 +215,8 @@ Output:
 ```
 ชาเย็น 1
 ```
+
+- PostgreSQL gives its own text for each type: a `bool` is `"t"` or `"f"`, a `numeric(10,2)` keeps its zeros (`"1.50"`).
 
 ## db_is_null
 
@@ -259,6 +265,7 @@ Output:
 ```
 
 - Column names become keys; INTEGER, REAL, TEXT and NULL become JSON numbers, strings and `null`.
+- PostgreSQL: integer, float and numeric columns become numbers (`NaN` and `Infinity` strings), `bool` `true`/`false`, `json`/`jsonb` are included as they are, everything else (dates, uuid, text) a string.
 - The easiest way to answer an API request with query results — no loop, no string building.
 
 ## db_last_id
@@ -282,6 +289,9 @@ Output:
 ```
 2
 ```
+
+- PostgreSQL has no last insert id: write `INSERT ... RETURNING id` and read it with `db_query` (it panics on a PostgreSQL connection, saying so). `RETURNING` works in SQLite too.
+- To insert unless it exists: `INSERT ... ON CONFLICT (name) DO NOTHING RETURNING id` — no row back means it was there already.
 
 ## db_error
 

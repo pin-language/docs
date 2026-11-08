@@ -377,6 +377,14 @@ serve(8080, "handle");
   values still go in `?`: `$sql = "SELECT id, item FROM orders WHERE 1 = 1"; if ($item != "") { $sql .= " AND
   item = ?"; $ps[] = $item; } if ($sort == "qty") { $sql .= " ORDER BY qty"; }`. Appending a non-literal
   (`$sql .= $sort`) does not compile. Secrets such as a database URL: `env("DATABASE_URL")`.
+- **PostgreSQL**: the same functions — `$db = db_open(env("DATABASE_URL"));` with
+  `postgres://user:password@host/name` (a `postgres://` literal in the code does not compile). Differences:
+  no `db_last_id` (it panics) — use `$r = db_query($db, "INSERT ... VALUES (?) RETURNING id", [...]);
+  db_next($r); db_int($r, "id")`; insert-unless-exists with `ON CONFLICT (name) DO NOTHING RETURNING id` (no row
+  back = already there; works in SQLite too); `db_int` is strict (a non-integer panics); `bool` reads as
+  `db_int` 1/0 and `db_string` `"t"`/`"f"`; `db_json` keeps `json`/`jsonb` as JSON. Use `SET LOCAL` inside
+  `BEGIN ... COMMIT`, never plain `SET` (does not compile: connections are reused). A query never blocks the
+  thread; `request_deadline()` cuts it with 504.
 - Every `db_*` function: [reference/database.md](https://github.com/pin-language/docs/blob/HEAD/reference/database.md).
 
 `json_decode` errors (all code 400, message = path + reason): `$: missing field "qty"`, `$: unknown field
