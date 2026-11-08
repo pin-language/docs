@@ -231,16 +231,21 @@ $db = db_open(":memory:");
 db_exec($db, "CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT UNIQUE, qty INTEGER, price REAL)", []);
 db_exec($db, "INSERT INTO items (name) VALUES (?)", ["tea"]);
 $rows = db_query($db, "SELECT name, qty FROM items", []);
-while (db_next($rows)) { echo db_is_null($rows, "qty") ? "qty is NULL" : "qty set", "\n"; }
+while (db_next($rows)) {
+    echo db_is_null($rows, "qty") ? "qty is NULL" : "qty set", "\n";
+    $qty = db_is_null($rows, "qty") ? null : db_int($rows, "qty");      // ?int
+    echo json_encode($qty), "\n";
+}
 ```
 
 Output:
 
 ```
 qty is NULL
+null
 ```
 
-- Pin has no `null` yet, so check this before trusting a 0 or `""` from a nullable column.
+- `db_int` / `db_float` / `db_string` read NULL as 0 / `""`, so check this before trusting them on a nullable column; `db_is_null(...) ? null : db_int(...)` gives a `?int`.
 
 ## db_json
 

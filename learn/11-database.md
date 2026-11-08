@@ -70,7 +70,7 @@ tea 40 hot
 cake 89 -
 ```
 
-Pin has no `null` yet, so a NULL column reads as `0` or `""`; ask `db_is_null` when it matters.
+A NULL column reads as `0` or `""`; ask `db_is_null` when it matters (`db_is_null($rows, "qty") ? null : db_int($rows, "qty")` gives a `?int`).
 
 ## Straight to JSON
 

@@ -1,8 +1,9 @@
 # Pin — Null
 
-**Status (2026-11-08):** steps 1–4 of the build plan are **built**: `?string`, `?list<T>`, `?map<K,V>` and
-`?ClassName`; checks that narrow (N2, for variables); `?->`, `??`, `?? throw` (N3, N4); JSON (N8). Steps 5
-(`?int`, `?float`, `?bool`) and 6 (`list<?T>`, `map<K,?T>`) are not built and are compile errors that say so.
+**Status (2026-11-09):** steps 1–5 of the build plan are **built**: `?string`, `?list<T>`, `?map<K,V>` and
+`?ClassName` (2026-11-08); checks that narrow (N2, for variables); `?->`, `??`, `?? throw` (N3, N4); JSON (N8);
+`?int`, `?float`, `?bool` (step 5, 2026-11-09). Step 6 (`list<?T>`, `map<K,?T>`) is not built and is a compile
+error that says so.
 See "As built" at the end. N5 (every property set when the constructor ends) was built in 0.5 with classes.
 
 Decision rule: memory safety > speed > clarity > looking like PHP.
@@ -146,3 +147,22 @@ What steps 1–4 do, and where they differ from the rules above.
   as a property beside a constructor, and `json_decode` refused `email` as an unknown field (with a constructor
   the fields are its parameters). The guide now shows the shape for an optional field
   (`public ?string $email = null` as a constructor parameter).
+
+### Step 5 as built (2026-11-09)
+
+- **Layout:** `?int` is `{ i64, i1 }` (the value, then "has a value"), `?float` `{ double, i1 }`, `?bool`
+  `{ i1, i1 }`, in variables, parameters and return values (`throws` functions return `{ {i64, i1}, ptr }`).
+  A property is stored with the same layout: two 8-byte slots for `?int` / `?float`, one for `?bool`, starting
+  as null because objects are zeroed. The value comes first, so a variable known not to be null loads only the
+  value and `int &` parameters can take it.
+- **Benchmarks:** the IR of all 51 existing tests, examples and benchmark programs is byte-for-byte the same as
+  before step 5, so their numbers cannot move. Nothing was timed because nothing could change.
+- Everything from steps 1–4 works the same for numbers: narrowing, `??` (the default runs only when the value is
+  null; `?int ?? int` is `int`, `?int ?? ?int` is `?int`, `?float ?? 0` is fine), `?? throw`, `?->` on a number
+  property or method (gives `?int`), `?:` with `null` or a `?int` on one side, `&` parameters, parameter and
+  property defaults, `isset()`, `json_encode` (`null`), `json_decode` (null or missing gives null; a wrong type
+  is still a 400). `5` where a `?int` goes and `3` where a `?float` goes just work.
+- **Not built:** `go` tasks cannot take or give `?int` / `?float` / `?bool` (a task frame keeps every value in
+  8 bytes; compile error). `strval()` / `intval()` of a `?int` is an error that says to check or use `??`.
+- Tests: `tests/null_scalars.pn`, `null_scalar_class.pn`, `null_scalar_flow.pn`; compile errors
+  `tests/errors/null_scalar.pn`, `null_scalar_go.pn`, `null_scalar_strval.pn`. ASAN + UBSAN clean on macOS.

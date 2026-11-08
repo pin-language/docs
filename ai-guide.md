@@ -190,8 +190,9 @@ echo json_encode($o), "\n";               // {"id":1,"items":[{"name":"tea","pri
 - Change items in place: `foreach ($users as &$u) { $u->visits += 1; }`
 - No inheritance, interfaces or static members. A class cannot hold itself directly (use `?Node`,
   `list<Node>` or an id). `==` does not compare objects: compare properties.
-- **null**: only a `?T` type can be null, and only for `?string`, `?list<T>`, `?map<K,V>` and `?ClassName`
-  (no `?int`/`?float`/`?bool`, no `list<?T>`/`map<K,?T>` yet). A new variable needs its type to start null:
+- **null**: only a `?T` type can be null: `?int`, `?float`, `?bool`, `?string`, `?list<T>`, `?map<K,V>`,
+  `?ClassName` (no `list<?T>`/`map<K,?T>` yet, and `go` tasks cannot take or give `?int`/`?float`/`?bool`).
+  `return 5;` from a `?int` function and `?float $f = 3;` just work. A new variable needs its type to start null:
   `?User $u = null;`. `?T` properties start as null, so `__construct` need not set them.
 - Before using a `?T` **variable**, check it: inside `if ($u !== null) { ... }`, after
   `if ($u === null) { return ...; }`, on the right of `$u !== null && ...`, and in `isset($u) ? ... : ...` it
@@ -243,7 +244,7 @@ function tally(list<int> $xs): map<int,int> {
     return $c;
 }
 
-// "not found": return ?T and check it (no ?int yet: use -1 for a number)
+// "not found": return ?T and check it (also for numbers: ?int, then $n ?? 0)
 class Customer {
     public string $name;
     public ?string $email;                       // starts as null
@@ -497,8 +498,7 @@ initialize, ids, notifications and errors; its README has a complete server.
 |---|---|
 | `array(1, 2)`, `[]` untyped | `[1, 2]`, `list<int> $a = [];` |
 | `$a = ["x" => 1, "y" => "s"]` (mixed) | one value type per map; build JSON strings for mixed objects |
-| `null`, `?User`, `?string` | the same for strings, lists, maps and objects; check before use (`!== null`) |
-| `?int`, `?float`, `?bool` | not yet — use `-1`, a parameter default, or a separate `bool` |
+| `null`, `?User`, `?string`, `?int` | the same; check before use (`!== null`, `??`) |
 | `class`, `new`, `->`, `$this` | the same; no `extends` / `interface` / `static`; objects move on `=` |
 | `function f(array &$a)`, `f($a)` | `function f(list<int> &$a)`, `f(&$a)` — `&` at the call too |
 | `throw new InvalidArgumentException("x")` | `throw error(400, "x");` in a function declared `: T throws` |
