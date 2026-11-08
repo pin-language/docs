@@ -6,7 +6,7 @@ New to Pin? Start with the [language guide](../language.md). Writing Pin with an
 
 ## [Strings](strings.md)
 
-[`strlen`](strings.md#strlen), [`substr`](strings.md#substr), [`strpos`](strings.md#strpos), [`str_contains`](strings.md#str_contains), [`str_starts_with`](strings.md#str_starts_with), [`str_ends_with`](strings.md#str_ends_with), [`str_repeat`](strings.md#str_repeat), [`strtolower`](strings.md#strtolower), [`strtoupper`](strings.md#strtoupper), [`trim`](strings.md#trim), [`explode`](strings.md#explode), [`implode`](strings.md#implode), [`PHP_EOL`](strings.md#php_eol)
+[`ord`](strings.md#ord), [`chr`](strings.md#chr), [`rawurlencode`](strings.md#rawurlencode), [`strlen`](strings.md#strlen), [`substr`](strings.md#substr), [`strpos`](strings.md#strpos), [`str_contains`](strings.md#str_contains), [`str_starts_with`](strings.md#str_starts_with), [`str_ends_with`](strings.md#str_ends_with), [`str_repeat`](strings.md#str_repeat), [`strtolower`](strings.md#strtolower), [`strtoupper`](strings.md#strtoupper), [`trim`](strings.md#trim), [`explode`](strings.md#explode), [`implode`](strings.md#implode), [`PHP_EOL`](strings.md#php_eol)
 
 ## [Lists and maps](lists-and-maps.md)
 

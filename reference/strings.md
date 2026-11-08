@@ -4,6 +4,9 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 
 | | |
 |---|---|
+| [`ord`](#ord) | The first byte of a string as a number (0 to 255); 0 for `""`. |
+| [`chr`](#chr) | A one-byte string with the byte `$n` (taken modulo 256, like PHP). |
+| [`rawurlencode`](#rawurlencode) | Percent-encode everything but `A-Z a-z 0-9 - _ . ~`, for a value inside a URL path or query. |
 | [`strlen`](#strlen) | Length of a string in bytes. |
 | [`substr`](#substr) | Part of a string, by byte offsets. |
 | [`strpos`](#strpos) | Byte position of the first match, or -1. |
@@ -17,6 +20,65 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`explode`](#explode) | Split a string into a list of strings. |
 | [`implode`](#implode) | Join a list into one string. |
 | [`PHP_EOL`](#php_eol) | The string `"\n"`. |
+
+## ord
+
+```php
+ord(string $s): int
+```
+
+The first byte of a string as a number (0 to 255); 0 for `""`.
+
+```php
+echo ord("A"), " ", ord("a"), " ", ord(""), " ", ord("ไ"), "\n";
+```
+
+Output:
+
+```
+65 97 0 224
+```
+
+- A byte, not a character: Thai and other non-ASCII characters are several bytes.
+
+## chr
+
+```php
+chr(int $n): string
+```
+
+A one-byte string with the byte `$n` (taken modulo 256, like PHP).
+
+```php
+echo chr(72), chr(105), chr(33 + 256), "\n";
+```
+
+Output:
+
+```
+Hi!
+```
+
+## rawurlencode
+
+```php
+rawurlencode(string $s): string
+```
+
+Percent-encode everything but `A-Z a-z 0-9 - _ . ~`, for a value inside a URL path or query.
+
+```php
+echo "/search?q=" . rawurlencode("tea & cake/ไทย"), "\n";
+```
+
+Output:
+
+```
+/search?q=tea%20%26%20cake%2F%E0%B9%84%E0%B8%97%E0%B8%A2
+```
+
+- Spaces become `%20` (PHP's `urlencode` writes `+`; Pin has only this one).
+- **PHP:** Same as PHP's `rawurlencode`.
 
 ## strlen
 
