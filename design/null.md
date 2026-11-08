@@ -1,11 +1,9 @@
 # Pin — Null
 
-**Status (2026-10-26):** **not built yet** — deliberately left for its own round (see "Build plan" at the end):
-it touches the type system, the flow analysis and value layout at once, and a rushed version risks memory
-safety. Parameter defaults (built 2026-10-26) already cover optional query values and optional JSON fields.
-Earlier status (Pin 0.4, 2026-10-25): **not built yet.** Today `null` and `?Type` are compile errors that say so;
-code uses defaults such as `-1`, `""` or `$m[$k] ?? $default` instead. Agreed with the owner on 2026-10-24.
-N5 (every property set when the constructor ends, no `$this` use before that) is built in 0.5 with classes.
+**Status (2026-11-08):** steps 1–4 of the build plan are **built**: `?string`, `?list<T>`, `?map<K,V>` and
+`?ClassName`; checks that narrow (N2, for variables); `?->`, `??`, `?? throw` (N3, N4); JSON (N8). Steps 5
+(`?int`, `?float`, `?bool`) and 6 (`list<?T>`, `map<K,?T>`) are not built and are compile errors that say so.
+See "As built" at the end. N5 (every property set when the constructor ends) was built in 0.5 with classes.
 
 Decision rule: memory safety > speed > clarity > looking like PHP.
 
@@ -99,3 +97,46 @@ Each step is a release-sized piece with its own tests, compile errors and ASAN r
 
 Fresh-agent test after step 3 (AI guide only): a lookup that may find nothing, an optional header, an optional
 JSON field.
+
+## As built (2026-11-08)
+
+What steps 1–4 do, and where they differ from the rules above.
+
+- **Layout (N6):** a `?T` value is the same pointer as a `T`, with null = 0. Nothing changes for code that uses no
+  `?T`: the IR of every existing test, example and benchmark is byte-for-byte the same apart from one unused
+  `declare` line, so benchmark numbers cannot move. Every free function already accepted null; copy and JSON of
+  a `?T` go through a generated helper that checks for null first (`pn_str_dup(NULL)` would give `""`).
+- **`null` takes its type from where it goes**, like `[]`: a `?T` variable, parameter, property, return value,
+  `??` default or `?:` arm. `$u = null;` for a new variable is an error that suggests `?User $u = null;` (a typed
+  declaration starting with `?` is new syntax). A parameter or property default may be `null`.
+- **Narrowing (N2) is per variable,** a set in `class Flow` intersected where paths meet. It understands `!== null`,
+  `=== null`, `isset($u)`, `!`, `&&`, `||` in `if`, `while`, `for` and `?:`, so
+  `if ($u === null) { return; }` narrows the rest of the function and `while ($u === null) { ... }` narrows after
+  the loop. Assigning a `?T` value, a move, or lending the variable with `&` to a `?T &` parameter removes it; a
+  loop removes every variable it may write before the first round (the next round may see null again).
+- **Not built from N2: narrowing a property.** `if ($u->email !== null) { strlen($u->email); }` is still an error;
+  the message says to read it into a variable first (`$e = $u->email;`), which for lists and objects is a borrow,
+  not a copy. Tracking "unchanged since the check" for paths is the part that needs the borrow machinery, and it is
+  not needed to write correct code.
+- **`=== null` on a value that can never be null is a compile error** (always true or always false), as is `?->`
+  on a non-null value. This catches PHP habits that hide a type mistake.
+- **`?->`** gives `?T` (`?string` for a string property, `?Address` for an object one). A field or method that
+  gives `int`/`float`/`bool` would need step 5 and is an error. `$u?->save();` works as a statement (void
+  methods too). On a variable it keeps all ownership checks, so a changing method is allowed; on a call result
+  or property path a changing method is an error (put it in a variable first).
+- **`??` on a `?T` value** gives `T` when the default is `T`. Ownership: strings come out owned on both paths. For
+  lists, maps and objects, if the left side is a function result and the default a variable, the default is
+  copied (the result must own one value either way); if the left side is borrowed and the default is new, the
+  result is borrowed and the default is freed at the end of the statement. `$m[$k] ?? $x` keeps its meaning.
+- **`?? throw error(...)`** leaves through the normal error path (the function must be `throws`, or inside `try`),
+  and the value is `T` after it.
+- **A class may hold `?Itself`** (linked lists, trees): null ends the chain, so it can be built. Free, copy and
+  JSON follow the chain recursively, the same as `list<Node>` already did. Walking one in a loop needs a borrow
+  of a borrow, which Pin does not have; recursion works.
+- **JSON (N8):** `json_encode` writes `null` and keeps null properties (`"email":null`). `json_decode` accepts JSON
+  `null` or a missing field for a `?T` property or constructor parameter; a wrong type is still a 400.
+- **A lexer fix found on the way:** `list<?string>` used to lex `<?` as the PHP open tag. `<?` now opens only
+  when a letter does not follow.
+- Tests: `tests/null_basics.pn`, `null_more.pn`, `null_linked.pn`, `null_json.pn`, `null_narrow.pn`, `null_ownership.pn`, and 14
+  compile errors `tests/errors/null_*.pn`. ASAN + UBSAN clean on macOS; the macOS `leaks` tool finds 0 leaks;
+  LeakSanitizer runs in CI on Linux.

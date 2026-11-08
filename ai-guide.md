@@ -188,8 +188,19 @@ echo json_encode($o), "\n";               // {"id":1,"items":[{"name":"tea","pri
 - `$u = $users[0];` (an object, list or map read from a list, map or property) **borrows** it read-only, no
   copy. While `$u` is still used later, `$users` cannot be changed. Need your own? `$u = copy($users[0]);`
 - Change items in place: `foreach ($users as &$u) { $u->visits += 1; }`
-- No inheritance, interfaces, static members, `null` or `?->` yet. A class cannot hold itself (use
+- No inheritance, interfaces or static members. A class cannot hold itself directly (use `?Node`,
   `list<Node>` or an id). `==` does not compare objects: compare properties.
+- **null**: only a `?T` type can be null, and only for `?string`, `?list<T>`, `?map<K,V>` and `?ClassName`
+  (no `?int`/`?float`/`?bool`, no `list<?T>`/`map<K,?T>` yet). A new variable needs its type to start null:
+  `?User $u = null;`. `?T` properties start as null, so `__construct` need not set them.
+- Before using a `?T` **variable**, check it: inside `if ($u !== null) { ... }`, after
+  `if ($u === null) { return ...; }`, on the right of `$u !== null && ...`, and in `isset($u) ? ... : ...` it
+  counts as `T`. Assigning it again (or lending it with `&` to a `?T &` parameter) means checking again. A check
+  on a **property** or call result does not carry over: `$e = $u->email; if ($e !== null) { ... }`.
+- `$u?->name` (null if `$u` is null; gives `?T`), `$x ?? "default"`, and
+  `$u = find($id) ?? throw error(404, "not found");` (a `User` from here on). `=== null` on a value that is
+  never null is a compile error. `json_encode` writes `null`; `json_decode` gives null for a `?T` field that is
+  `null` or missing.
 - Promote only `int float bool string` constructor parameters. For a list, map or object property, declare it
   (`public list<int> $scores = [];`) and set it with `$this->scores = copy($scores);` in `__construct`.
 - `&` also takes paths: `drop_lowest(&$students[1])`, `f(&$o->items)`.
@@ -227,10 +238,19 @@ function tally(list<int> $xs): map<int,int> {
     return $c;
 }
 
-// "not found" without null: return -1 / "" and check it
-function find(list<int> $xs, int $want): int {
-    foreach ($xs as $i => $x) { if ($x == $want) { return $i; } }
-    return -1;
+// "not found": return ?T and check it (no ?int yet: use -1 for a number)
+class Customer {
+    public string $name;
+    public ?string $email;                       // starts as null
+    public function __construct(string $name) { $this->name = $name; }
+}
+function find_customer(list<Customer> $all, string $name): ?Customer {
+    foreach ($all as $c) { if ($c->name == $name) { return copy($c); } }
+    return null;
+}
+function email_of(list<Customer> $all, string $name): string throws {
+    $c = find_customer($all, $name) ?? throw error(404, "no customer $name");
+    return $c->email ?? "(no email)";            // $c is a Customer here; the ?string needs ??
 }
 
 // mixed JSON object: a class, then json_encode()
@@ -472,7 +492,8 @@ initialize, ids, notifications and errors; its README has a complete server.
 |---|---|
 | `array(1, 2)`, `[]` untyped | `[1, 2]`, `list<int> $a = [];` |
 | `$a = ["x" => 1, "y" => "s"]` (mixed) | one value type per map; build JSON strings for mixed objects |
-| `null`, `?int` | not yet — use `-1`, `""`, empty list, or a separate `bool` |
+| `null`, `?User`, `?string` | the same for strings, lists, maps and objects; check before use (`!== null`) |
+| `?int`, `?float`, `?bool` | not yet — use `-1`, a parameter default, or a separate `bool` |
 | `class`, `new`, `->`, `$this` | the same; no `extends` / `interface` / `static`; objects move on `=` |
 | `function f(array &$a)`, `f($a)` | `function f(list<int> &$a)`, `f(&$a)` — `&` at the call too |
 | `throw new InvalidArgumentException("x")` | `throw error(400, "x");` in a function declared `: T throws` |

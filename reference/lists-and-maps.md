@@ -9,7 +9,7 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`copy`](#copy) | An independent copy you own, with everything inside it. |
 | [`sort`](#sort) | Sort a list variable in place, smallest first. |
 | [`rsort`](#rsort) | Sort a list variable in place, largest first. |
-| [`isset`](#isset) | Whether a list index is in range or a map key exists. |
+| [`isset`](#isset) | Whether a list index is in range, a map key exists, or a ?T variable is not null. |
 | [`array_key_exists`](#array_key_exists) | Same as `isset($m[$key])`. |
 | [`unset`](#unset) | Remove a map entry (nothing happens if it is missing). |
 
@@ -57,7 +57,7 @@ Output:
 ## copy
 
 ```php
-copy(list|map|object|string $x): same type
+copy(list|map|object|string|?T $x): same type
 ```
 
 An independent copy you own, with everything inside it.
@@ -133,25 +133,29 @@ Output:
 ## isset
 
 ```php
-isset($list[$i] | $map[$key]): bool
+isset($list[$i] | $map[$key] | ?T $x): bool
 ```
 
-Whether a list index is in range or a map key exists.
+Whether a list index is in range, a map key exists, or a ?T variable is not null.
 
 ```php
 $m = ["tea" => 40];
 $xs = [10, 20];
 echo isset($m["tea"]) ? "y" : "n", isset($m["cake"]) ? "y" : "n", isset($xs[1]) ? "y" : "n", isset($xs[5]) ? "y" : "n", "\n";
+?string $note = null;
+echo isset($note) ? "set" : "null", "\n";
 ```
 
 Output:
 
 ```
 ynyn
+null
 ```
 
 - Use it (or `??`) before reading a key that may be missing: reading a missing map key panics.
-- **PHP:** Works only on one list item or map entry; there is no `null`, so there is no `isset($x)` for a plain variable.
+- `isset($x)` on a `?T` variable is the same as `$x !== null`, and like it, counts `$x` as checked in the branch where it is true.
+- **PHP:** Works on one list item, one map entry, or one `?T` variable; not on a property path or an expression.
 
 ## array_key_exists
 
