@@ -14,6 +14,7 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`query_has`](#query_has) | Whether the query string has `$key`, even with an empty value. |
 | [`form_param`](#form_param) | One value from a form body (`a=1&b=2`), decoded, or `""`. |
 | [`form_has`](#form_has) | Whether a form body has `$key`. |
+| [`request_deadline`](#request_deadline) | Give the running request at most `$ms` milliseconds. |
 | [`sse_start`](#sse_start) | Turn the response into a Server-Sent Events stream (`text/event-stream`), sent as it is written. |
 | [`sse_send`](#sse_send) | Send one event (`data:` lines; a newline in the text starts a new line). |
 | [`sse_send_id`](#sse_send_id) | Send one event with an id; a reconnecting browser sends it back as the `Last-Event-ID` header. |
@@ -224,6 +225,35 @@ Output:
 ```
 yn
 ```
+
+## request_deadline
+
+```php
+request_deadline(int $ms): void
+```
+
+Give the running request at most `$ms` milliseconds.
+
+```php
+function handle(string $method, string $path, string $body): string throws {
+    request_deadline(300);                     // the whole request, tasks included
+    $s = hub_subscribe("orders");
+    return try hub_next($s, 5000);             // ends at 300 ms with error 504
+}
+echo "inside serve() only\n";
+```
+
+Output:
+
+```
+inside serve() only
+```
+
+- When the time is up, every wait of the request ends — `await`, `sleep_ms`, `hub_next`, `http_get` / `http_post`, `run`, also inside its tasks — and fails with error 504; whatever the handler returns after that, the client gets `504 {"error":"Gateway Timeout"}`.
+- Code that computes without waiting is not interrupted: the deadline takes effect at its next wait.
+- Calling it again can only make the deadline earlier. Outside a `serve()` request it does nothing.
+- 1 to 3600000 ms (else panic).
+- **PHP:** Like `set_time_limit()` for one request, but it also stops the request's tasks and network waits.
 
 ## sse_start
 

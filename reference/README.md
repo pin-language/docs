@@ -26,7 +26,7 @@ New to Pin? Start with the [language guide](../language.md). Writing Pin with an
 
 ## [HTTP](http.md)
 
-[`serve`](http.md#serve), [`http_status`](http.md#http_status), [`request_header`](http.md#request_header), [`request_has_header`](http.md#request_has_header), [`response_header`](http.md#response_header), [`url_path`](http.md#url_path), [`query_param`](http.md#query_param), [`query_has`](http.md#query_has), [`form_param`](http.md#form_param), [`form_has`](http.md#form_has), [`sse_start`](http.md#sse_start), [`sse_send`](http.md#sse_send), [`sse_send_id`](http.md#sse_send_id), [`sse_comment`](http.md#sse_comment)
+[`serve`](http.md#serve), [`http_status`](http.md#http_status), [`request_header`](http.md#request_header), [`request_has_header`](http.md#request_has_header), [`response_header`](http.md#response_header), [`url_path`](http.md#url_path), [`query_param`](http.md#query_param), [`query_has`](http.md#query_has), [`form_param`](http.md#form_param), [`form_has`](http.md#form_has), [`request_deadline`](http.md#request_deadline), [`sse_start`](http.md#sse_start), [`sse_send`](http.md#sse_send), [`sse_send_id`](http.md#sse_send_id), [`sse_comment`](http.md#sse_comment)
 
 ## [Database (SQLite)](database.md)
 
