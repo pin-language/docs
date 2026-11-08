@@ -201,7 +201,12 @@ echo json_encode($o), "\n";               // {"id":1,"items":[{"name":"tea","pri
   `$u = find($id) ?? throw error(404, "not found");` (a `User` from here on). `=== null` on a value that is
   never null is a compile error. `json_encode` writes `null`; `json_decode` gives null for a `?T` field that is
   `null` or missing.
-- Promote only `int float bool string` constructor parameters. For a list, map or object property, declare it
+- **An optional JSON field:** make it a `?T` constructor parameter with `= null`:
+  `class NewUser { public function __construct(public string $name, public ?string $email = null) {} }`.
+  `json_decode` fills a class with a constructor **through the constructor's parameters only**: a `?T` property
+  that is not a parameter is an `unknown field` in the body. A property default (`public string $name = "";`)
+  does not make a field optional; only `?T` does.
+- Promote only `int float bool string` and `?string` constructor parameters. For a list, map or object property, declare it
   (`public list<int> $scores = [];`) and set it with `$this->scores = copy($scores);` in `__construct`.
 - `&` also takes paths: `drop_lowest(&$students[1])`, `f(&$o->items)`.
 - `json_encode` writes public properties in declaration order (promoted ones sit where `__construct` is in the
@@ -408,7 +413,7 @@ serve(8080, "handle");
 - Every `db_*` function: [reference/database.md](https://github.com/pin-language/docs/blob/HEAD/reference/database.md).
 
 `json_decode` errors (all code 400, message = path + reason): `$: missing field "qty"`, `$: unknown field
-"extra"` (unknown fields are refused, not ignored), `$: field "qty" appears twice`, `$.qty: want an integer, got
+"extra"` (unknown fields are refused, not ignored; with a constructor, the fields are its parameters), `$: field "qty" appears twice`, `$.qty: want an integer, got
 a string`, `invalid JSON: ... at byte N`; a constructor's own `throw error(400, "...")` comes through as it is.
 
 Session tokens in a database: store `hash("sha256", $token)` and look the row up by that hash

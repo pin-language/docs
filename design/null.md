@@ -140,3 +140,9 @@ What steps 1–4 do, and where they differ from the rules above.
 - Tests: `tests/null_basics.pn`, `null_more.pn`, `null_linked.pn`, `null_json.pn`, `null_narrow.pn`, `null_ownership.pn`, and 14
   compile errors `tests/errors/null_*.pn`. ASAN + UBSAN clean on macOS; the macOS `leaks` tool finds 0 leaks;
   LeakSanitizer runs in CI on Linux.
+- **Fresh-agent test (Sonnet, AI guide only, 2026-11-09):** a lookup returning `?User` (404 when null), an
+  optional `X-Request-Id` header as a `?string`, and a POST with an optional `email` field. `pin check` was clean
+  on the first round and every curl case was right. One gap, in the guide: the agent declared `?string $email`
+  as a property beside a constructor, and `json_decode` refused `email` as an unknown field (with a constructor
+  the fields are its parameters). The guide now shows the shape for an optional field
+  (`public ?string $email = null` as a constructor parameter).
