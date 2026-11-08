@@ -1,6 +1,6 @@
 # Tack — the web framework for Pin
 
-**Status (2026-11-08):** **M1, M2, M3, M4 and M6 built** (M5 not) in github.com/pin-language/tack (package `tack.pn`, the `tack`
+**Status (2026-11-08):** **M1–M6 built** in github.com/pin-language/tack (package `tack.pn`, the `tack`
 command, `examples/shop`, CI on Linux and macOS); needs Pin from `next`. Prerequisites P1, P2, P5 and
 parameter defaults are built (table below); null and the PostgreSQL driver are not. Open questions for the
 owner are in the last section.
@@ -36,6 +36,11 @@ owner are in the last section.
   Deadlines (T6) built afterwards: Pin's new `request_deadline(ms)` puts the request on its thread's list and
   the worker loop cancels it on time (the client-left path), waits fail with 504 and the answer is 504;
   Tack calls it from a route's or a folder guard's `deadline(): int`.
+- **M5 as built:** without compiler changes — the `tack` command finds every `db_exec` / `db_query` / `db_json`
+  whose SQL is literal in the routes and their local modules and prepares it (`EXPLAIN`) against
+  `migrations/*.sql` in an in-memory SQLite; also checks `?` against a literal value list. Migrations run at
+  start (table `tack_migrations`) and with `tack migrate`. Not built from T7: `db_all` / `db_one` into classes
+  (needs the compiler) and checks of SQL assembled in variables.
 - Speed gate, measured: `GET /` through Tack 221k–277k req/s vs a hand-written `serve()` 220k–260k (M2, load
   generator on the same machine): no difference beyond the noise.
 
