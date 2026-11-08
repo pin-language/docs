@@ -388,7 +388,7 @@ Session tokens in a database: store `hash("sha256", $token)` and look the row up
 database does not contain usable tokens. `hash_equals` is for comparing two secrets in memory (an API key from
 the environment, an HMAC signature).
 
-Sign-in and secrets: store `password_hash($password)` (PBKDF2-SHA256, ~0.5 s: only at sign-up / login) and check
+Sign-in and secrets: store `password_hash($password)` (PBKDF2-SHA256, slow on purpose: ~0.04 s on arm64, ~0.5 s on x86 — only at sign-up / login) and check
 with `password_verify($password, $hash)`. Session tokens and API keys: `random_token(16)`, compared with
 `hash_equals($known, $given)` (never `==`). Signatures: `hash_hmac("sha256", $data, $key)`. Random numbers:
 `random_int($min, $max)` (there is no `rand()`). `hash()` / `hash_hmac()` accept only `"sha256"`.
