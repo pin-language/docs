@@ -1,6 +1,6 @@
 # Tack — the web framework for Pin
 
-**Status (2026-11-08):** **M1, M2, M3 and M6 built** in github.com/pin-language/tack (package `tack.pn`, the `tack`
+**Status (2026-11-08):** **M1, M2, M3, M6 and M4's stream routes built** (deadlines not) in github.com/pin-language/tack (package `tack.pn`, the `tack`
 command, `examples/shop`, CI on Linux and macOS); needs Pin from `next`. Prerequisites P1, P2, P5 and
 parameter defaults are built (table below); null and the PostgreSQL driver are not. Open questions for the
 owner are in the last section.
@@ -31,6 +31,10 @@ owner are in the last section.
   `tools/call` re-enters the dispatcher with the caller's headers, so guards apply per tool; 4xx/5xx →
   `isError: true` with the route's message. `Origin` refused unless listed (DNS rebinding). Checked in CI with
   the official MCP Python SDK. tack.json may set `"name"`. Needed Pin's new `rawurlencode()`.
+- **M4 (first half) as built:** T5 — `stream()` returns the topic; `Accept: text/event-stream` selects it when
+  the file also has `get()`; stream-only files answer 406 without it; in tests a stream answers its topic.
+  Deadlines (T6) are not built: every wait in the runtime (await, sleep_ms, hub_next, sockets, run) would have
+  to see the request's remaining time — a Pin runtime change, to design first.
 - Speed gate, measured: `GET /` through Tack 221k–277k req/s vs a hand-written `serve()` 220k–260k (M2, load
   generator on the same machine): no difference beyond the noise.
 
