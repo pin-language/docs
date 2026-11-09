@@ -291,36 +291,27 @@ function median(list<int> $xs): float {     // assumes count($xs) > 0
 }
 ```
 
-Money: keep integer satang/cents; format at the end with `number_format($satang / 100, 2)` or `sprintf("%.2f", $satang / 100)`.
+Money: keep integer satang/cents; format at the end: `number_format($satang / 100, 2)` gives `"1,234.50"`.
+
+Sorting by your own rule: a named comparison function, `<=>` gives -1 / 0 / 1 (the arguments are read-only loans):
 
 ```php
-function baht(int $satang): string {        // 123450 -> "1234.50", -5 -> "-0.05"
-    $sign = $satang < 0 ? "-" : "";
-    $abs = $satang < 0 ? -$satang : $satang;
-    $frac = $abs % 100;
-    return $sign . intdiv($abs, 100) . "." . ($frac < 10 ? "0" . $frac : strval($frac));
+class Line { public function __construct(public string $item, public int $total) {} }
+function by_total_desc(Line $a, Line $b): int { return $b->total <=> $a->total; }   // ties keep their order
+function top3(list<Line> $lines): list<Line> {
+    $sorted = copy($lines);
+    usort($sorted, "by_total_desc");
+    return array_slice($sorted, 0, 3);
 }
 ```
 
-Top N from a map by value (`sort` has no custom comparison yet): pick the best not yet used, N times.
+A map by value: `arsort($counts);` (largest first, keys kept), then `array_slice(array_keys($counts), 0, 3)`.
 
-```php
-function top3(map<string,int> $counts): string {
-    map<string,bool> $used = [];
-    $out = "";
-    for ($round = 0; $round < 3; $round++) {
-        $best = "";
-        $bestN = -1;
-        foreach ($counts as $w => $n) {
-            if (!isset($used[$w]) && $n > $bestN) { $best = $w; $bestN = $n; }
-        }
-        if ($bestN < 0) { break; }
-        $used[$best] = true;
-        $out .= "$best: $bestN\n";
-    }
-    return $out;
-}
-```
+Checking client input: `filter_var($email, FILTER_VALIDATE_EMAIL)` is the string or null,
+`filter_var($s, FILTER_VALIDATE_INT)` an `?int` — test with `=== null`, not `!`.
+
+Text in columns: `sprintf("%-10s", $s)` and `str_pad` count **bytes** (as PHP); for Thai, cut with
+`grapheme_substr($s, 0, 10)` and pad with `str_repeat(" ", 10 - grapheme_strlen($cut))`.
 
 Strings in lists: `explode`, `implode`, `list<string>`.
 
@@ -560,8 +551,8 @@ comparing** (`$key = normalizer_normalize(mb_strtolower($email), Normalizer::FOR
 `"Café"` and `"Cafe" . mb_chr(769)` are then one user). `chr()` above 127 panics: use `mb_chr()`. Text from outside that is not
 UTF-8 (a header, a database column, another server) arrives with U+FFFD in place of the bad bytes; a request
 body or path that is not UTF-8 gets 400. `/` always gives a float; use `intdiv($a, $b)`.
-Ints wrap around on overflow. Bit operators `| & ^ ~ << >>` work on ints (`json_encode($v, JSON_PRETTY_PRINT)`);
-`0xFF`, `0b1010`, `1_000_000` literals. `array_pop($xs)` / `array_shift($xs)` give `?T` (null when empty).
+Ints wrap around on overflow. Bit operators `| & ^ ~ << >>` work on ints; `0xFF`, `0b1010`, `1_000_000` literals.
+`json_encode($v, JSON_PRETTY_PRINT)` indents with 4 spaces, as PHP. `array_pop($xs)` / `array_shift($xs)` give `?T` (null when empty).
 
 ## Errors → fixes
 

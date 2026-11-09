@@ -122,3 +122,8 @@ text.pn:4: panic: substr() would cut a character in half at byte 4 of "ไทย
   "สวัสดีค…" cut at 5 graphemes. Guide gaps it named were fixed: variables keep one type per function, `?int` can
   be promoted (the guide said it could not), a null property is still written, when to call `db_pool()`, the
   mixed-map table row, and a normalise-before-`UNIQUE` example.
+- **Fresh-agent test 2 (Sonnet, AI guide only, 2026-11-09, after ~70 PHP built-ins):** a report over orders with
+  `filter_var`, `usort` + `<=>`, `date`, `grapheme_substr` for Thai item names, `number_format`, `ksort`,
+  `array_unique`, `mb_strtoupper`, `JSON_PRETTY_PRINT`. **Compiled on the first `pin check`, 0 errors**, output
+  right. Guide gaps fixed: `sprintf` / `str_pad` widths are bytes (pad Thai with `grapheme_strlen`), a `usort` / `<=>`
+  example, `filter_var` usage, a stale "no custom comparison" line and an old hand-written money formatter.
