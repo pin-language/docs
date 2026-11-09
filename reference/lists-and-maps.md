@@ -4,6 +4,10 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 
 | | |
 |---|---|
+| [`in_array`](#in_array) | Whether the list holds the value (lists of int, float, bool, string). |
+| [`array_keys`](#array_keys) | The keys of a map, in insertion order. |
+| [`array_values`](#array_values) | The values of a map, in insertion order (copied). |
+| [`array_sum`](#array_sum) | The sum of a list of numbers. |
 | [`count`](#count) | Number of items in a list or entries in a map. |
 | [`fill`](#fill) | A new list with `$n` copies of `$value`. |
 | [`copy`](#copy) | An independent copy you own, with everything inside it. |
@@ -12,6 +16,84 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`isset`](#isset) | Whether a list index is in range, a map key exists, or a ?T variable is not null. |
 | [`array_key_exists`](#array_key_exists) | Same as `isset($m[$key])`. |
 | [`unset`](#unset) | Remove a map entry (nothing happens if it is missing). |
+
+## in_array
+
+```php
+in_array(T $value, list<T> $xs): bool
+```
+
+Whether the list holds the value (lists of int, float, bool, string).
+
+```php
+echo in_array("tea", ["coffee", "tea"]) ? "yes" : "no", " ", in_array(4, [1, 2, 3]) ? "yes" : "no", "\n";
+```
+
+Output:
+
+```
+yes no
+```
+
+- Compares strictly, like `in_array($v, $xs, true)`. For many lookups use a `map<string,bool>` and `isset()`.
+
+## array_keys
+
+```php
+array_keys(map<K,V> $m): list<K>
+```
+
+The keys of a map, in insertion order.
+
+```php
+echo json_encode(array_keys(["a" => 1, "b" => 2])), "\n";
+```
+
+Output:
+
+```
+["a","b"]
+```
+
+## array_values
+
+```php
+array_values(map<K,V> $m): list<V>
+```
+
+The values of a map, in insertion order (copied).
+
+```php
+echo json_encode(array_values(["a" => 1, "b" => 2])), "\n";
+```
+
+Output:
+
+```
+[1,2]
+```
+
+- Not for maps of `?int` / `?float` / `?bool` yet.
+
+## array_sum
+
+```php
+array_sum(list<int> $xs): int  /  array_sum(list<float> $xs): float
+```
+
+The sum of a list of numbers.
+
+```php
+echo array_sum([1, 2, 3]), " ", array_sum([0.5, 0.25]), "\n";
+```
+
+Output:
+
+```
+6 0.75
+```
+
+- Ints wrap around like `+`.
 
 ## count
 

@@ -5,6 +5,12 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | | |
 |---|---|
 | [`intdiv`](#intdiv) | Integer division, rounding toward zero. |
+| [`round`](#round) | Round half away from zero, like PHP. |
+| [`floor`](#floor) | The largest whole number not above `$x`. |
+| [`ceil`](#ceil) | The smallest whole number not below `$x`. |
+| [`abs`](#abs) | The value without its sign (the same type). |
+| [`max`](#max) | The larger of two numbers, or the largest item of a list. |
+| [`min`](#min) | The smaller of two numbers, or the smallest item of a list. |
 | [`sqrt`](#sqrt) | Square root. |
 | [`wrapping_add`](#wrapping_add) | `$a + $b`, wrapping around on 64-bit overflow on purpose. |
 | [`wrapping_sub`](#wrapping_sub) | `$a - $b` with 64-bit wrap-around. |
@@ -33,6 +39,124 @@ Output:
 
 - `/` always gives a float, like PHP; use `intdiv()` for list indexes and counts.
 - Division by zero panics; `intdiv(PHP_INT_MIN, -1)` panics (there is no int answer).
+
+## round
+
+```php
+round(float $x, int $digits = 0): float
+```
+
+Round half away from zero, like PHP.
+
+```php
+echo round(2.5), " ", round(-2.5), " ", round(1.955, 2), " ", round(1234.5, -2), "\n";
+```
+
+Output:
+
+```
+3 -3 1.96 1200
+```
+
+- `round(1.955, 2)` is 1.96 as in PHP, though the stored double is a little below 1.955.
+- The result is a float; `(int)round($x)` for an int.
+
+## floor
+
+```php
+floor(float $x): float
+```
+
+The largest whole number not above `$x`.
+
+```php
+echo floor(2.7), " ", floor(-2.1), "\n";
+```
+
+Output:
+
+```
+2 -3
+```
+
+## ceil
+
+```php
+ceil(float $x): float
+```
+
+The smallest whole number not below `$x`.
+
+```php
+echo ceil(2.1), " ", ceil(-2.7), "\n";
+```
+
+Output:
+
+```
+3 -2
+```
+
+## abs
+
+```php
+abs(int|float $x): int|float
+```
+
+The value without its sign (the same type).
+
+```php
+echo abs(-7), " ", abs(-2.5), "\n";
+```
+
+Output:
+
+```
+7 2.5
+```
+
+- `abs(PHP_INT_MIN)` wraps to itself, like `-`.
+
+## max
+
+```php
+max(int|float $a, int|float $b): int|float  /  max(list<int|float> $xs)
+```
+
+The larger of two numbers, or the largest item of a list.
+
+```php
+echo max(3, 9), " ", max(2, 2.5), " ", max([4, 11, 7]), "\n";
+```
+
+Output:
+
+```
+9 2.5 11
+```
+
+- An int and a float give a float. `max([])` panics (PHP throws).
+- **PHP:** Numbers only (no strings, no more than two values).
+
+## min
+
+```php
+min(int|float $a, int|float $b): int|float  /  min(list<int|float> $xs)
+```
+
+The smaller of two numbers, or the smallest item of a list.
+
+```php
+echo min(3, 9), " ", min([4.5, -1.0]), "\n";
+```
+
+Output:
+
+```
+3 -1
+```
+
+- `min([])` panics (PHP throws).
 
 ## sqrt
 

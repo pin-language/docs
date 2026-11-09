@@ -27,6 +27,17 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`strtolower`](#strtolower) | Lower-case copy; only A–Z change. |
 | [`strtoupper`](#strtoupper) | Upper-case copy; only a–z change. |
 | [`trim`](#trim) | Copy without leading and trailing whitespace. |
+| [`str_replace`](#str_replace) | Replace every `$search` in `$subject`. |
+| [`ltrim`](#ltrim) | Copy without leading whitespace (as `trim()`). |
+| [`rtrim`](#rtrim) | Copy without trailing whitespace (as `trim()`). |
+| [`ucfirst`](#ucfirst) | Copy with the first letter in upper case (ASCII a–z). |
+| [`lcfirst`](#lcfirst) | Copy with the first letter in lower case (ASCII A–Z). |
+| [`htmlspecialchars`](#htmlspecialchars) | Escape `& < > " '` for HTML, so text from users cannot become markup. |
+| [`base64_encode`](#base64_encode) | Standard base64 (RFC 4648) of the bytes of a string. |
+| [`base64_decode`](#base64_decode) | The text a base64 string holds. |
+| [`rawurldecode`](#rawurldecode) | Decode `%XX` (the opposite of `rawurlencode`). |
+| [`urldecode`](#urldecode) | Like `rawurldecode`, and `+` becomes a space (form encoding). |
+| [`number_format`](#number_format) | A number with grouped thousands, rounded to `$decimals` places. |
 | [`explode`](#explode) | Split a string into a list of strings. |
 | [`implode`](#implode) | Join a list into one string. |
 | [`PHP_EOL`](#php_eol) | The string `"\n"`. |
@@ -508,6 +519,224 @@ Output:
 ```
 
 - Removes spaces, tabs, `\n`, `\r` and `\v`. There is no second argument yet.
+
+## str_replace
+
+```php
+str_replace(string $search, string $replace, string $subject): string
+```
+
+Replace every `$search` in `$subject`.
+
+```php
+echo str_replace("cat", "dog", "cat and catalog"), " ", str_replace("-", "", "08-1234-5678"), "\n";
+```
+
+Output:
+
+```
+dog and dogalog 0812345678
+```
+
+- Left to right, matches do not overlap; an empty `$search` changes nothing.
+- **PHP:** `str_replace()` with three strings (no arrays, no count argument).
+
+## ltrim
+
+```php
+ltrim(string $s): string
+```
+
+Copy without leading whitespace (as `trim()`).
+
+```php
+echo "[", ltrim("  x  "), "]\n";
+```
+
+Output:
+
+```
+[x  ]
+```
+
+## rtrim
+
+```php
+rtrim(string $s): string
+```
+
+Copy without trailing whitespace (as `trim()`).
+
+```php
+echo "[", rtrim("  x  \n"), "]\n";
+```
+
+Output:
+
+```
+[  x]
+```
+
+## ucfirst
+
+```php
+ucfirst(string $s): string
+```
+
+Copy with the first letter in upper case (ASCII a–z).
+
+```php
+echo ucfirst("hello world"), "\n";
+```
+
+Output:
+
+```
+Hello world
+```
+
+- **PHP:** Like PHP 8.2+: only a-z.
+
+## lcfirst
+
+```php
+lcfirst(string $s): string
+```
+
+Copy with the first letter in lower case (ASCII A–Z).
+
+```php
+echo lcfirst("HelloWorld"), "\n";
+```
+
+Output:
+
+```
+helloWorld
+```
+
+## htmlspecialchars
+
+```php
+htmlspecialchars(string $s): string
+```
+
+Escape `& < > " '` for HTML, so text from users cannot become markup.
+
+```php
+echo htmlspecialchars("<b>Tom & 'Jerry'</b>"), "\n";
+```
+
+Output:
+
+```
+&lt;b&gt;Tom &amp; &#039;Jerry&#039;&lt;/b&gt;
+```
+
+- Use it on every value you put into HTML (`response_header("Content-Type", "text/html; charset=utf-8")`).
+- **PHP:** `htmlspecialchars($s)` with PHP 8.1's defaults (`ENT_QUOTES`).
+
+## base64_encode
+
+```php
+base64_encode(string $s): string
+```
+
+Standard base64 (RFC 4648) of the bytes of a string.
+
+```php
+echo base64_encode("user:secret"), "\n";
+```
+
+Output:
+
+```
+dXNlcjpzZWNyZXQ=
+```
+
+## base64_decode
+
+```php
+base64_decode(string $s): string throws
+```
+
+The text a base64 string holds.
+
+```php
+$auth = "Basic dXNlcjpzZWNyZXQ=";
+echo try base64_decode(substr($auth, 6)), "\n";
+echo try base64_decode("%%%") catch ($e) { "error " . $e->code; }, "\n";
+```
+
+Output:
+
+```
+user:secret
+error 400
+```
+
+- Reads the standard and the URL-safe alphabet (`-` `_`), with or without `=` padding; whitespace is skipped.
+- Fails with 400 for other characters, and when the decoded bytes are not UTF-8 text (Pin has no binary strings yet).
+- **PHP:** PHP returns `false` (or the bytes) instead of failing.
+
+## rawurldecode
+
+```php
+rawurldecode(string $s): string
+```
+
+Decode `%XX` (the opposite of `rawurlencode`).
+
+```php
+echo rawurldecode("tea%20%26%20cake%2F%E0%B9%84"), "\n";
+```
+
+Output:
+
+```
+tea & cake/ไ
+```
+
+- Bytes that are not UTF-8 after decoding become U+FFFD. `query_param()` already decodes query values.
+
+## urldecode
+
+```php
+urldecode(string $s): string
+```
+
+Like `rawurldecode`, and `+` becomes a space (form encoding).
+
+```php
+echo urldecode("tea+%26+cake"), "\n";
+```
+
+Output:
+
+```
+tea & cake
+```
+
+## number_format
+
+```php
+number_format(float $x, int $decimals = 0, string $point = ".", string $thousands = ","): string
+```
+
+A number with grouped thousands, rounded to `$decimals` places.
+
+```php
+echo number_format(1234567.891), " ", number_format(1234567.891, 2), " ", number_format(4500 / 100, 2, ".", ""), "\n";
+```
+
+Output:
+
+```
+1,234,568 1,234,567.89 45.00
+```
+
+- For money keep integer satang/cents and format at the end: `number_format($satang / 100, 2)`.
+- **PHP:** Same as PHP's.
 
 ## explode
 
