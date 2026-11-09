@@ -39,6 +39,7 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`sprintf`](#sprintf) | Format values into a string, like C and PHP. |
 | [`printf`](#printf) | Print what `sprintf` would give; returns its length in bytes. |
 | [`str_pad`](#str_pad) | Pad a string to `$length` bytes. |
+| [`mb_str_pad`](#mb_str_pad) | Pad a string to `$length` characters (code points). |
 | [`STR_PAD_LEFT`](#str_pad_left) | For `str_pad()`: pad on the left. |
 | [`STR_PAD_RIGHT`](#str_pad_right) | For `str_pad()`: pad on the right (the default). |
 | [`STR_PAD_BOTH`](#str_pad_both) | For `str_pad()`: pad both sides. |
@@ -767,6 +768,27 @@ Output:
 ```
 
 - `STR_PAD_RIGHT` (default), `STR_PAD_LEFT`, `STR_PAD_BOTH`. Lengths are bytes, as in PHP; only whole characters of `$pad` are added, so the result can be a little shorter with a Thai `$pad`.
+
+## mb_str_pad
+
+```php
+mb_str_pad(string $s, int $length, string $pad = " ", int $type = STR_PAD_RIGHT): string
+```
+
+Pad a string to `$length` characters (code points).
+
+```php
+echo "[", mb_str_pad("ไทย", 6, "-"), "] [", mb_str_pad("ab", 5, "ไ", STR_PAD_LEFT), "]\n";
+```
+
+Output:
+
+```
+[ไทย---] [ไไไab]
+```
+
+- For Thai with vowels and tone marks, a reader sees fewer characters than there are code points: pad with `grapheme_strlen()` when the column must line up.
+- **PHP:** PHP 8.3's mb_str_pad().
 
 ## STR_PAD_LEFT
 
