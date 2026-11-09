@@ -4,6 +4,7 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 
 | | |
 |---|---|
+| [`usort`](#usort) | Sort a list in place with your own comparison function. |
 | [`array_pop`](#array_pop) | Take the last item out of the list, or null when it is empty. |
 | [`array_shift`](#array_shift) | Take the first item out of the list, or null when it is empty. |
 | [`array_slice`](#array_slice) | A copy of part of a list. |
@@ -23,6 +24,33 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`isset`](#isset) | Whether a list index is in range, a map key exists, or a ?T variable is not null. |
 | [`array_key_exists`](#array_key_exists) | Same as `isset($m[$key])`. |
 | [`unset`](#unset) | Remove a map entry (nothing happens if it is missing). |
+
+## usort
+
+```php
+usort(list<T> $xs, string $compare): void
+```
+
+Sort a list in place with your own comparison function.
+
+```php
+class Item { public function __construct(public string $name, public int $price) {} }
+function by_price(Item $a, Item $b): int { return $a->price - $b->price; }
+list<Item> $items = [new Item("cake", 120), new Item("tea", 45), new Item("rice", 30)];
+usort($items, "by_price");
+foreach ($items as $i) { echo $i->name, " "; }
+echo "\n";
+```
+
+Output:
+
+```
+rice tea cake 
+```
+
+- `$compare` is the name of a function in the same file, `(T $a, T $b): int`: negative puts `$a` first, positive `$b`, 0 keeps their order (the sort is stable). It cannot be `throws`.
+- Lists of int, float, string, objects, lists or maps. A list of bools: `sort()`.
+- **PHP:** `usort($xs, 'by_price')` with a function name; Pin has no closures yet.
 
 ## array_pop
 
