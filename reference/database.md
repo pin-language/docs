@@ -43,7 +43,7 @@ Output:
 - `db` values move like lists; pass `$db` to functions (they borrow it). A task (`go`) cannot use the caller's `$db`: open one inside the task.
 - SQL that would change the connection for its next user (`PRAGMA foreign_keys = ...`, `ATTACH`, `CREATE TEMP ...`; for PostgreSQL `SET` without `LOCAL`, `RESET`, `LISTEN`, `PREPARE`, `DISCARD`, `set_config(..., false)`, `pg_advisory_lock()`) does not compile.
 - PostgreSQL: `db_open(env("DATABASE_URL"))` with `postgres://user:password@host:5432/name` (or `postgresql://`). The same `db_*` functions and `?` placeholders work; the URL as a literal in the code does not compile, so the password stays out of git. It needs PostgreSQL's client library at run time (Ubuntu/Debian `libpq5`, macOS `brew install libpq`); TLS options go in the URL (`?sslmode=require`).
-- PostgreSQL waits never block the thread: while one request waits for the database, the others run. A server that is down panics (500) after up to 10 s.
+- PostgreSQL waits never block the thread: while one request waits for the database, the others run. A server that is down panics after up to 10 s; inside a handler that answers 503 (try again later), not 500.
 - **PHP:** Pin's version of `new PDO('sqlite:shop.db')` / `new PDO('pgsql:...')`.
 
 ## db_pool
@@ -67,7 +67,7 @@ pool set
 
 - Without it each file gets 4 connections per thread, closed after 60 s unused.
 - Only at the top level of the program, before `serve()` (compile error inside a function).
-- When a thread's connections are all in use, `db_open()` waits (other requests keep running) for up to 5 seconds, then panics — a 500 inside a handler. A handler holds a connection while it waits (`sleep_ms`, `await`, `http_get`), so raise the limit for handlers like that.
+- When a thread's connections are all in use, `db_open()` waits (other requests keep running) for up to 5 seconds, then panics — a 503 inside a handler (clients may retry). A handler holds a connection while it waits (`sleep_ms`, `await`, `http_get`), so raise the limit for handlers like that.
 - PostgreSQL: threads × `$per_thread` must stay under the server's `max_connections` (100 by default); the program prints a warning at the first connection when it does not.
 - **PHP:** Like `PDO::ATTR_PERSISTENT` / `pg_pconnect`, but the connection is always returned clean.
 
