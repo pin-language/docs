@@ -38,8 +38,9 @@ so fix and re-check. Exit code 0 = ok, 1 = compile error or run-time panic, 2 = 
 1. **Types.** `int float bool string list<T> map<K,V> void`, plus your classes. `K` ∈ int/string; `T` and `V`
    can be any type, nested: `list<Order>`, `list<list<int>>`, `map<string,list<string>>`, `map<int,User>`.
 2. **Every parameter and return type is written.** `function f(int $n, list<int> $xs): string`.
-3. **A variable keeps the type of its first value.** Empty containers need the type:
-   `list<int> $ids = [];` `map<string,int> $count = [];`
+3. **A variable keeps the type of its first value**, in the whole function (two `if` branches cannot use one name
+   for two types: give each its own name). Empty containers need the type: `list<int> $ids = [];`
+   `map<string,int> $count = [];`
 4. **Conditions are bool.** `if ($n != 0)`, `if (count($xs) > 0)`, `if (strlen($s) > 0)` — never `if ($n)`.
 5. **A variable must have a value on every path before use.** Initialise before `if` / loops.
 6. **Lists, maps and objects move on `=`.** After `$b = $a;` do not use `$a`. Want two? `$b = copy($a);`
@@ -204,7 +205,8 @@ echo json_encode($o), "\n";               // {"id":1,"items":[{"name":"tea","pri
 - `$u?->name` (null if `$u` is null; gives `?T`), `$x ?? "default"`, and
   `$u = find($id) ?? throw error(404, "not found");` (a `User` from here on). `=== null` on a value that is
   never null is a compile error. `json_encode` writes `null`; `json_decode` gives null for a `?T` field that is
-  `null` or missing.
+  `null` or missing. A null property is still written (`"email":null`); for an answer that leaves a key out,
+  use a second class without that property.
 - **Items that may be null:** `list<?int> $xs = [1, null, 3];` (`[1, null]` alone is already `list<?int>`),
   `$xs[] = null;`, `fill(3, null)`. `$xs[$i]` is `?int`: put it in a variable and check it, or write
   `$xs[$i] ?? 0` (the default also when the item is missing). `isset($m[$k])` is false for a null value, as in
@@ -214,7 +216,8 @@ echo json_encode($o), "\n";               // {"id":1,"items":[{"name":"tea","pri
   `json_decode` fills a class with a constructor **through the constructor's parameters only**: a `?T` property
   that is not a parameter is an `unknown field` in the body. A property default (`public string $name = "";`)
   does not make a field optional; only `?T` does.
-- Promote only `int float bool string` and `?string` constructor parameters. For a list, map or object property, declare it
+- Promote `int float bool string` and their `?` forms (`public ?int $score = null` is an optional JSON number).
+  For a list, map or object property, declare it
   (`public list<int> $scores = [];`) and set it with `$this->scores = copy($scores);` in `__construct`.
 - `&` also takes paths: `drop_lowest(&$students[1])`, `f(&$o->items)`.
 - `json_encode` writes public properties in declaration order (promoted ones sit where `__construct` is in the
@@ -384,7 +387,9 @@ Request helpers (all take strings and never fail on bad input):
 - **Standard input**: `$line = try read_line() catch ($e) { break; };` (note the `;` after `}`) (end of input fails with code 1; output
   is flushed before it waits). An MCP server over stdio: the `github.com/pin-language/mcp` package.
 
-Database (SQLite) — open one connection per request; it goes back to a per-thread pool automatically (a task opens its own):
+Database (SQLite) — open one connection per request; it goes back to a per-thread pool automatically (a task opens its own).
+The pool needs no setup (4 connections per thread); `db_pool("app.db", 8, 60000)` at the top level before `serve()`
+changes that, e.g. for handlers that hold a connection while they wait:
 
 ```php
 function handle(string $method, string $path, string $body): string {
@@ -509,7 +514,7 @@ initialize, ids, notifications and errors; its README has a complete server.
 | PHP | Pin |
 |---|---|
 | `array(1, 2)`, `[]` untyped | `[1, 2]`, `list<int> $a = [];` |
-| `$a = ["x" => 1, "y" => "s"]` (mixed) | one value type per map; build JSON strings for mixed objects |
+| `$a = ["x" => 1, "y" => "s"]` (mixed) | one value type per map; for a mixed JSON object, a class and `json_encode` |
 | `null`, `?User`, `?string`, `?int` | the same; check before use (`!== null`, `??`) |
 | `class`, `new`, `->`, `$this` | the same; no `extends` / `interface` / `static`; objects move on `=` |
 | `function f(array &$a)`, `f($a)` | `function f(list<int> &$a)`, `f(&$a)` — `&` at the call too |
@@ -551,7 +556,8 @@ Strings are always valid UTF-8. `strlen` / `substr` / `strpos` count bytes (`str
 `mb_substr` / `mb_strpos` count code points; **to shorten text for display use `grapheme_substr()`** (keeps Thai
 vowels and tone marks, and emoji, whole). `mb_strtolower()` / `mb_strtoupper()` for non-ASCII letters;
 **usernames, emails and lookup keys: `normalizer_normalize($s, Normalizer::FORM_KC)` before storing and before
-comparing**. `chr()` above 127 panics: use `mb_chr()`. Text from outside that is not
+comparing** (`$key = normalizer_normalize(mb_strtolower($email), Normalizer::FORM_KC);` into a `UNIQUE` column:
+`"Café"` and `"Cafe" . mb_chr(769)` are then one user). `chr()` above 127 panics: use `mb_chr()`. Text from outside that is not
 UTF-8 (a header, a database column, another server) arrives with U+FFFD in place of the bad bytes; a request
 body or path that is not UTF-8 gets 400. `/` always gives a float; use `intdiv($a, $b)`.
 Ints wrap around on overflow.
@@ -564,6 +570,7 @@ Ints wrap around on overflow.
 | `may have been moved on line N (on one path…)` | copy in that branch, or reassign after the `if` |
 | `is moved inside a loop` | move after the loop, `copy()`, or `break` right after the move |
 | `may be used before it is assigned` | give it a value before the `if`/loop |
+| `is already T; a variable keeps one type` | use another name (the type holds for the whole function, every branch) |
 | `substr() would cut a character in half` | `grapheme_substr()` for display, `mb_substr()` for code points, or a position from `strpos()` |
 | `is a parameter lent to this function read-only` | declare `T &$p` and call with `&$x`, or `$copy = copy($p);` |
 | `can change its argument $x, so write f(&$x)` | add `&` at the call |

@@ -115,3 +115,10 @@ text.pn:4: panic: substr() would cut a character in half at byte 4 of "ไทย
   this work, 54 KB now). Benchmark times unchanged.
 - Tests: `tests/strings_utf8.pn`, `tests/strings_case_norm.pn`, `tests/panics/chr_high.pn`, `substr_cut.pn`, and
   the server checks in `tests/run_tests.py` (body, path → 400; a bad header byte → U+FFFD).
+- **Fresh-agent test (Sonnet, AI guide only, 2026-11-09):** a notes API with normalised unique user names, an
+  optional `?int` score, Thai titles cut with `grapheme_substr`, `db_all` / `db_one` into classes, a checked
+  `?string` property and `mb_strtoupper`. Two `pin check` rounds (one error: reusing a variable name with another
+  type in a second `if` branch); every curl case right, including the decomposed "Café" refused as a duplicate and
+  "สวัสดีค…" cut at 5 graphemes. Guide gaps it named were fixed: variables keep one type per function, `?int` can
+  be promoted (the guide said it could not), a null property is still written, when to call `db_pool()`, the
+  mixed-map table row, and a normalise-before-`UNIQUE` example.
