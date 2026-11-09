@@ -4,6 +4,8 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 
 | | |
 |---|---|
+| [`array_map`](#array_map) | A new list: the function applied to each item. |
+| [`array_filter`](#array_filter) | A new list of the items the function keeps. |
 | [`usort`](#usort) | Sort a list in place with your own comparison function. |
 | [`array_pop`](#array_pop) | Take the last item out of the list, or null when it is empty. |
 | [`array_shift`](#array_shift) | Take the first item out of the list, or null when it is empty. |
@@ -24,6 +26,50 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`isset`](#isset) | Whether a list index is in range, a map key exists, or a ?T variable is not null. |
 | [`array_key_exists`](#array_key_exists) | Same as `isset($m[$key])`. |
 | [`unset`](#unset) | Remove a map entry (nothing happens if it is missing). |
+
+## array_map
+
+```php
+array_map(string $function, list<T> $xs): list<R>
+```
+
+A new list: the function applied to each item.
+
+```php
+function label(int $satang): string { return number_format($satang / 100, 2); }
+echo json_encode(array_map("label", [4500, 12000])), "\n";
+```
+
+Output:
+
+```
+["45.00","120.00"]
+```
+
+- `$function` is the name of a function in the same file taking one `T` and giving any `R`; it cannot be `throws`. The compiler writes the loop: no callback at run time.
+- **PHP:** `array_map('label', $xs)` with a function name (Pin has no closures yet); one list.
+
+## array_filter
+
+```php
+array_filter(list<T> $xs, string $keep): list<T>
+```
+
+A new list of the items the function keeps.
+
+```php
+function cheap(int $price): bool { return $price < 100; }
+echo json_encode(array_filter([45, 120, 30], "cheap")), "\n";
+```
+
+Output:
+
+```
+[45,30]
+```
+
+- `$keep` names a function of the same file `(T $x): bool`. The kept items are copied, and the new list is renumbered from 0 (PHP keeps the old keys).
+- **PHP:** PHP keeps the original keys; Pin's result is a list numbered from 0.
 
 ## usort
 
