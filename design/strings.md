@@ -1,10 +1,9 @@
 # Pin — Strings and Thai text
 
-**Status (Pin 0.4, 2026-10-25):** **mostly not built yet.** Today strings are bytes like PHP: `strlen`,
-`substr` and `strpos` count bytes, and nothing validates UTF-8 or protects against cutting a character in half.
-Built since this design: `list<string>`, `explode`, `implode`, `sort` (0.2), and JSON output keeps UTF-8 as is.
-The rules below (UTF-8 invariant, character-aware functions, normalisation) are agreed with the owner
-(2026-10-24) but not implemented.
+**Status (2026-11-09):** ST1, ST3 and ST4 are **built** on `next` (see "As built" at the end): strings are always
+valid UTF-8, `substr()` panics rather than cut a character, `mb_strlen` / `mb_substr` / `mb_strpos` / `mb_chr` /
+`mb_ord` and `grapheme_strlen` / `grapheme_substr`. Not built: ST2 (`bytes`), ST5's `mb_strtolower` /
+`mb_strtoupper`, ST6 (normalisation), the SIMD validator and the ASCII flag of ST4.
 
 Decision rule: memory safety > speed > clarity > looking like PHP.
 
@@ -77,3 +76,29 @@ text.pn:4: panic: substr() would cut a character in half at byte 4 of "ไทย
    table, a few KB).
 4. Tests: Thai, emoji, combining marks, overlong (`C0 AF`), surrogates (`ED A0 80`), cutting inside a
    character → panic.
+
+## As built (2026-11-09)
+
+- **ST1, where text comes in:** the request line (method and path) and the body are checked before the handler
+  runs; a request that is not UTF-8 gets **400**. Everything else from outside has bad bytes replaced by U+FFFD,
+  WHATWG-style (one per "maximal subpart"): request headers, values decoded from `%XX` (`query_param`,
+  `form_param`: `%C8` alone is not UTF-8), `db_string` / `db_json` / `db_error` (a SQLite TEXT column can hold
+  any bytes, so can PostgreSQL's SQL_ASCII), `http_get` / `http_post` / `stream_next` answers, `run()` output,
+  `read_line()`, `env()`, and every error message (they quote other servers' answers cut at a byte limit).
+  Reason for replacing instead of failing: these are not requests to refuse, and most have no error path.
+  JSON `\u` escapes were already safe: a lone surrogate is U+FFFD in `json_string()` and an error (400) in
+  `json_decode()`. Source files must be UTF-8 (the compiler checks), so literals are valid.
+- **`chr()` above 127 panics** (it would make a lone byte). This is the one place Pin breaks PHP for ST1;
+  `mb_chr()` gives the character. `tests/bytes.pn` had built all 256 bytes and now builds 128.
+- **Validator:** scalar, eight ASCII bytes at a time, not SIMD yet. Measured cost on the HTTP path: see the
+  numbers in HANDOFF (a request is checked once, path and body only).
+- **ST3:** `substr()` checks that neither end falls on a continuation byte (`10xxxxxx`); the panic names the
+  character and its bytes. `strpos()` results never fail it.
+- **ST4:** `mb_*` count code points (O(n), no ASCII flag yet). `grapheme_*` follow UAX #29 extended grapheme
+  clusters, all rules including GB9c (Indic conjuncts) and GB11 (emoji ZWJ sequences), from a table generated
+  by `tools/gen_unicode.py` out of Python 3.15's `unicodedata` (Unicode 17.0, 2,168 ranges, 27 KB) — no
+  download, no ICU. `tools/check_unicode.py` compares Pin with Python's `unicodedata.iter_graphemes()` on random
+  strings of every property: 100,000 strings, 0 differences. `mb_chr()` of a non-character panics (PHP returns
+  `false`); `mb_ord("")` panics (PHP throws).
+- Tests: `tests/strings_utf8.pn`, `tests/panics/chr_high.pn`, `substr_cut.pn`, and the server checks in
+  `tests/run_tests.py` (body, path → 400; a bad header byte → U+FFFD).

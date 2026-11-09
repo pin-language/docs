@@ -9,6 +9,13 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`rawurlencode`](#rawurlencode) | Percent-encode everything but `A-Z a-z 0-9 - _ . ~`, for a value inside a URL path or query. |
 | [`strlen`](#strlen) | Length of a string in bytes. |
 | [`substr`](#substr) | Part of a string, by byte offsets. |
+| [`mb_strlen`](#mb_strlen) | Length in characters (Unicode code points). |
+| [`mb_substr`](#mb_substr) | Part of a string, counted in characters (code points). |
+| [`mb_strpos`](#mb_strpos) | Position of the first match in characters, or -1. |
+| [`mb_chr`](#mb_chr) | The character with this Unicode code point. |
+| [`mb_ord`](#mb_ord) | The Unicode code point of the first character. |
+| [`grapheme_strlen`](#grapheme_strlen) | Length in what people see as characters (grapheme clusters). |
+| [`grapheme_substr`](#grapheme_substr) | Part of a string, counted in what people see as characters. **Use this to shorten text for display.** |
 | [`strpos`](#strpos) | Byte position of the first match, or -1. |
 | [`str_contains`](#str_contains) | Whether `$needle` occurs in `$haystack`. |
 | [`str_starts_with`](#str_starts_with) | Whether `$s` begins with `$prefix`. |
@@ -58,6 +65,9 @@ Output:
 ```
 Hi!
 ```
+
+- A byte above 127 panics: alone it is not UTF-8, and every Pin string is valid UTF-8. `mb_chr($n)` gives the character with that code point.
+- **PHP:** `chr(200)` gives one byte in PHP; in Pin it panics (use `mb_chr(200)` for "È").
 
 ## rawurlencode
 
@@ -119,8 +129,159 @@ world|llo|ell|ell||
 ```
 
 - A negative `$start` counts from the end; a negative `$length` stops that many bytes before the end.
-- Out-of-range offsets give a shorter or empty string, never a panic.
-- Offsets are bytes: cutting inside a Thai character gives broken text.
+- Out-of-range offsets give a shorter or empty string.
+- Offsets are bytes. One that falls inside a character (each Thai character is 3 bytes) **panics** instead of giving broken text; positions from `strpos()` never do. To count characters use `mb_substr()`, to shorten text for display `grapheme_substr()`.
+- **PHP:** The same, except that cutting a character in half panics instead of giving invalid UTF-8.
+
+## mb_strlen
+
+```php
+mb_strlen(string $s): int
+```
+
+Length in characters (Unicode code points).
+
+```php
+echo mb_strlen("hello"), " ", mb_strlen("ไทย"), " ", mb_strlen("ที่"), "\n";
+```
+
+Output:
+
+```
+5 3 3
+```
+
+- A Thai tone mark or vowel above or below a letter is a code point of its own: `"ที่"` is 3. To count what a reader sees, use `grapheme_strlen()`.
+- **PHP:** `mb_strlen($s)` with UTF-8; there is no encoding argument.
+
+## mb_substr
+
+```php
+mb_substr(string $s, int $start, int $length = rest): string
+```
+
+Part of a string, counted in characters (code points).
+
+```php
+echo mb_substr("สวัสดีครับ", 0, 4), "|", mb_substr("สวัสดีครับ", -4), "|", mb_substr("abc", 5), "|\n";
+```
+
+Output:
+
+```
+สวัส|ครับ||
+```
+
+- The same rules as `substr()` for negative and out-of-range values, in code points.
+- It can separate a tone mark from its letter (`mb_substr("ที่", 0, 2)` is `"ที"`); for text people read, use `grapheme_substr()`.
+- **PHP:** `mb_substr()` with UTF-8.
+
+## mb_strpos
+
+```php
+mb_strpos(string $haystack, string $needle): int
+```
+
+Position of the first match in characters, or -1.
+
+```php
+echo mb_strpos("ภาษาไทย", "ไทย"), " ", strpos("ภาษาไทย", "ไทย"), " ", mb_strpos("abc", "z"), "\n";
+```
+
+Output:
+
+```
+4 12 -1
+```
+
+- Use it with `mb_substr()`; `strpos()` gives bytes, for `substr()`.
+- **PHP:** PHP returns `false` when not found; Pin returns `-1`.
+
+## mb_chr
+
+```php
+mb_chr(int $codepoint): string
+```
+
+The character with this Unicode code point.
+
+```php
+echo mb_chr(3652), mb_chr(3607), mb_chr(3618), " ", mb_chr(128077), "\n";
+```
+
+Output:
+
+```
+ไทย 👍
+```
+
+- A value that is not a character (negative, above 0x10FFFF, or a surrogate 0xD800–0xDFFF) panics.
+- **PHP:** PHP returns `false` for those.
+
+## mb_ord
+
+```php
+mb_ord(string $s): int
+```
+
+The Unicode code point of the first character.
+
+```php
+echo mb_ord("ไ"), " ", mb_ord("A"), " ", mb_ord("👍"), "\n";
+```
+
+Output:
+
+```
+3652 65 128077
+```
+
+- `mb_ord("")` panics (PHP throws a ValueError).
+
+## grapheme_strlen
+
+```php
+grapheme_strlen(string $s): int
+```
+
+Length in what people see as characters (grapheme clusters).
+
+```php
+echo grapheme_strlen("ที่นี่"), " ", mb_strlen("ที่นี่"), " ", grapheme_strlen("👨‍👩‍👧🇹🇭"), "\n";
+```
+
+Output:
+
+```
+2 6 2
+```
+
+- Unicode's extended grapheme clusters (UAX #29, Unicode 17): a Thai letter with its vowel and tone marks, an emoji with its skin tone or family members, a flag, are one each.
+- ASCII is as fast as `mb_strlen()`; other text looks each code point up in a table (O(n)).
+- **PHP:** `grapheme_strlen()` (PHP's intl extension).
+
+## grapheme_substr
+
+```php
+grapheme_substr(string $s, int $start, int $length = rest): string
+```
+
+Part of a string, counted in what people see as characters. **Use this to shorten text for display.**
+
+```php
+$title = "ที่นี่มีน้ำใจ";
+echo grapheme_substr($title, 0, 4), "…|", mb_substr($title, 0, 4), "…|", grapheme_substr($title, -2), "\n";
+```
+
+Output:
+
+```
+ที่นี่มีน้ำ…|ที่น…|ใจ
+```
+
+- The same rules as `substr()` for negative and out-of-range values, in grapheme clusters.
+- Never separates a tone mark or vowel from its letter, or an emoji from its modifier.
+- **PHP:** `grapheme_substr()`; PHP returns `false` when `$start` is past the end, Pin returns `""`.
 
 ## strpos
 
