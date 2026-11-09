@@ -10,7 +10,7 @@ New to Pin? Start with the [language guide](../language.md). Writing Pin with an
 
 ## [Lists and maps](lists-and-maps.md)
 
-[`array_slice`](lists-and-maps.md#array_slice), [`array_merge`](lists-and-maps.md#array_merge), [`array_reverse`](lists-and-maps.md#array_reverse), [`array_search`](lists-and-maps.md#array_search), [`array_unique`](lists-and-maps.md#array_unique), [`in_array`](lists-and-maps.md#in_array), [`array_keys`](lists-and-maps.md#array_keys), [`array_values`](lists-and-maps.md#array_values), [`array_sum`](lists-and-maps.md#array_sum), [`count`](lists-and-maps.md#count), [`fill`](lists-and-maps.md#fill), [`copy`](lists-and-maps.md#copy), [`sort`](lists-and-maps.md#sort), [`rsort`](lists-and-maps.md#rsort), [`isset`](lists-and-maps.md#isset), [`array_key_exists`](lists-and-maps.md#array_key_exists), [`unset`](lists-and-maps.md#unset)
+[`array_pop`](lists-and-maps.md#array_pop), [`array_shift`](lists-and-maps.md#array_shift), [`array_slice`](lists-and-maps.md#array_slice), [`array_merge`](lists-and-maps.md#array_merge), [`array_reverse`](lists-and-maps.md#array_reverse), [`array_search`](lists-and-maps.md#array_search), [`array_unique`](lists-and-maps.md#array_unique), [`in_array`](lists-and-maps.md#in_array), [`array_keys`](lists-and-maps.md#array_keys), [`array_values`](lists-and-maps.md#array_values), [`array_sum`](lists-and-maps.md#array_sum), [`count`](lists-and-maps.md#count), [`fill`](lists-and-maps.md#fill), [`copy`](lists-and-maps.md#copy), [`sort`](lists-and-maps.md#sort), [`rsort`](lists-and-maps.md#rsort), [`isset`](lists-and-maps.md#isset), [`array_key_exists`](lists-and-maps.md#array_key_exists), [`unset`](lists-and-maps.md#unset)
 
 ## [Numbers](numbers.md)
 
@@ -22,7 +22,7 @@ New to Pin? Start with the [language guide](../language.md). Writing Pin with an
 
 ## [JSON](json.md)
 
-[`json_encode`](json.md#json_encode), [`json_raw`](json.md#json_raw), [`json_len`](json.md#json_len), [`json_at`](json.md#json_at), [`json_has`](json.md#json_has), [`json_decode`](json.md#json_decode), [`json_string`](json.md#json_string), [`json_int`](json.md#json_int), [`json_float`](json.md#json_float), [`json_bool`](json.md#json_bool)
+[`JSON_PRETTY_PRINT`](json.md#json_pretty_print), [`JSON_UNESCAPED_SLASHES`](json.md#json_unescaped_slashes), [`JSON_UNESCAPED_UNICODE`](json.md#json_unescaped_unicode), [`JSON_THROW_ON_ERROR`](json.md#json_throw_on_error), [`json_encode`](json.md#json_encode), [`json_raw`](json.md#json_raw), [`json_len`](json.md#json_len), [`json_at`](json.md#json_at), [`json_has`](json.md#json_has), [`json_decode`](json.md#json_decode), [`json_string`](json.md#json_string), [`json_int`](json.md#json_int), [`json_float`](json.md#json_float), [`json_bool`](json.md#json_bool)
 
 ## [HTTP](http.md)
 

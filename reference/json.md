@@ -4,7 +4,11 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 
 | | |
 |---|---|
-| [`json_encode`](#json_encode) | JSON text for a value. |
+| [`JSON_PRETTY_PRINT`](#json_pretty_print) | For `json_encode($v, JSON_PRETTY_PRINT)`: indented output, as PHP. |
+| [`JSON_UNESCAPED_SLASHES`](#json_unescaped_slashes) | Accepted for PHP code; Pin never escapes `/`. |
+| [`JSON_UNESCAPED_UNICODE`](#json_unescaped_unicode) | Accepted for PHP code; Pin writes UTF-8 as it is. |
+| [`JSON_THROW_ON_ERROR`](#json_throw_on_error) | Accepted for PHP code; `json_encode` cannot fail in Pin. |
+| [`json_encode`](#json_encode) | JSON text for a value (`JSON_PRETTY_PRINT` to indent). |
 | [`json_raw`](#json_raw) | The JSON text of one value of an object (an object, an array or anything), to read further with the json_* functions. |
 | [`json_len`](#json_len) | The number of items of a JSON array (or keys of an object); -1 when the text is neither. |
 | [`json_at`](#json_at) | The JSON text of item `$i` (from 0) of a JSON array, or `""` when there is no such item. |
@@ -15,13 +19,90 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`json_float`](#json_float) | A top-level number as a float, or 0.0. |
 | [`json_bool`](#json_bool) | Whether a top-level value is `true`. |
 
+## JSON_PRETTY_PRINT
+
+```php
+JSON_PRETTY_PRINT: int
+```
+
+For `json_encode($v, JSON_PRETTY_PRINT)`: indented output, as PHP.
+
+```php
+echo json_encode(["a" => [1, 2]], JSON_PRETTY_PRINT), "\n";
+```
+
+Output:
+
+```
+{
+    "a": [
+        1,
+        2
+    ]
+}
+```
+
+## JSON_UNESCAPED_SLASHES
+
+```php
+JSON_UNESCAPED_SLASHES: int
+```
+
+Accepted for PHP code; Pin never escapes `/`.
+
+```php
+echo JSON_UNESCAPED_SLASHES, "\n";
+```
+
+Output:
+
+```
+64
+```
+
+## JSON_UNESCAPED_UNICODE
+
+```php
+JSON_UNESCAPED_UNICODE: int
+```
+
+Accepted for PHP code; Pin writes UTF-8 as it is.
+
+```php
+echo JSON_UNESCAPED_UNICODE, "\n";
+```
+
+Output:
+
+```
+256
+```
+
+## JSON_THROW_ON_ERROR
+
+```php
+JSON_THROW_ON_ERROR: int
+```
+
+Accepted for PHP code; `json_encode` cannot fail in Pin.
+
+```php
+echo JSON_THROW_ON_ERROR, "\n";
+```
+
+Output:
+
+```
+4194304
+```
+
 ## json_encode
 
 ```php
-json_encode(int|float|bool|string|list|map|object|?T $x): string
+json_encode(int|float|bool|string|list|map|object|?T $x, int $flags = 0): string
 ```
 
-JSON text for a value.
+JSON text for a value (`JSON_PRETTY_PRINT` to indent).
 
 ```php
 class Line {

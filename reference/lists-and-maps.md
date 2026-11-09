@@ -4,6 +4,8 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 
 | | |
 |---|---|
+| [`array_pop`](#array_pop) | Take the last item out of the list, or null when it is empty. |
+| [`array_shift`](#array_shift) | Take the first item out of the list, or null when it is empty. |
 | [`array_slice`](#array_slice) | A copy of part of a list. |
 | [`array_merge`](#array_merge) | A new list: the items of `$a`, then those of `$b` (copied). |
 | [`array_reverse`](#array_reverse) | A copy of the list in reverse order. |
@@ -21,6 +23,50 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`isset`](#isset) | Whether a list index is in range, a map key exists, or a ?T variable is not null. |
 | [`array_key_exists`](#array_key_exists) | Same as `isset($m[$key])`. |
 | [`unset`](#unset) | Remove a map entry (nothing happens if it is missing). |
+
+## array_pop
+
+```php
+array_pop(list<T> $xs): ?T
+```
+
+Take the last item out of the list, or null when it is empty.
+
+```php
+list<int> $stack = [1, 2, 3];
+$top = array_pop($stack);
+echo $top ?? -1, " ", count($stack), "\n";
+```
+
+Output:
+
+```
+3 2
+```
+
+- The item moves out to the result (no copy); `array_pop($xs) ?? $default` when the list may be empty.
+- **PHP:** Same, null when empty (Pin's result type is `?T`).
+
+## array_shift
+
+```php
+array_shift(list<T> $xs): ?T
+```
+
+Take the first item out of the list, or null when it is empty.
+
+```php
+list<string> $queue = ["a", "b"];
+echo array_shift($queue) ?? "none", " ", json_encode($queue), "\n";
+```
+
+Output:
+
+```
+a ["b"]
+```
+
+- Moves every other item down: O(n).
 
 ## array_slice
 

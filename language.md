@@ -57,6 +57,9 @@ echo $msg;         // fine
 - Compound: `+= -= *= /= %= .=`, `++`, `--`. `/=` needs a float variable.
 - Comparison: `== != < <= > >= === !==` (no implicit conversions between types).
 - Logic: `&& || !` — on `bool` only.
+- Bits (ints): `| & ^ ~ << >>` and `|= &= ^= <<= >>=`, with PHP 8's precedence (`&` binds looser than `==`, so
+  write `($flags & 4) != 0`). A shift by 64 or more gives 0 (`>>` of a negative: -1); a negative shift panics.
+  Literals: `0xFF`, `0b1010`, `0o17`, `1_000_000`.
 - Strings: `.` joins, `.=` appends. `"Hello $name"` and `"{$name}s"` interpolate.
 - `$cond ? $a : $b`, and `$m[$k] ?? $default` / `$list[$i] ?? $default`.
 - Casts: `(int)` (from float, bool or string), `(float)` (from int or string; `floatval()` does the same),
