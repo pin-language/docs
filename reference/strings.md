@@ -29,6 +29,13 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`trim`](#trim) | Copy without leading and trailing whitespace. |
 | [`sprintf`](#sprintf) | Format values into a string, like C and PHP. |
 | [`printf`](#printf) | Print what `sprintf` would give; returns its length in bytes. |
+| [`str_pad`](#str_pad) | Pad a string to `$length` bytes. |
+| [`STR_PAD_LEFT`](#str_pad_left) | For `str_pad()`: pad on the left. |
+| [`STR_PAD_RIGHT`](#str_pad_right) | For `str_pad()`: pad on the right (the default). |
+| [`STR_PAD_BOTH`](#str_pad_both) | For `str_pad()`: pad both sides. |
+| [`ucwords`](#ucwords) | Upper-case the first letter of every word (ASCII a–z). |
+| [`strrev`](#strrev) | The string backwards, by what a reader sees as characters. |
+| [`is_numeric`](#is_numeric) | Whether the text is a number PHP would accept (`12`, `-1.5`, `2e3`, spaces around). |
 | [`str_replace`](#str_replace) | Replace every `$search` in `$subject`. |
 | [`ltrim`](#ltrim) | Copy without leading whitespace (as `trim()`). |
 | [`rtrim`](#rtrim) | Copy without trailing whitespace (as `trim()`). |
@@ -564,6 +571,140 @@ Output:
 ```
 tea  |  2.2|
 ```
+
+## str_pad
+
+```php
+str_pad(string $s, int $length, string $pad = " ", int $type = STR_PAD_RIGHT): string
+```
+
+Pad a string to `$length` bytes.
+
+```php
+echo "[", str_pad("7", 3, "0", STR_PAD_LEFT), "] [", str_pad("ab", 6), "] [", str_pad("ab", 6, "-", STR_PAD_BOTH), "]\n";
+```
+
+Output:
+
+```
+[007] [ab    ] [--ab--]
+```
+
+- `STR_PAD_RIGHT` (default), `STR_PAD_LEFT`, `STR_PAD_BOTH`. Lengths are bytes, as in PHP; only whole characters of `$pad` are added, so the result can be a little shorter with a Thai `$pad`.
+
+## STR_PAD_LEFT
+
+```php
+STR_PAD_LEFT: int
+```
+
+For `str_pad()`: pad on the left.
+
+```php
+echo STR_PAD_LEFT, "\n";
+```
+
+Output:
+
+```
+0
+```
+
+## STR_PAD_RIGHT
+
+```php
+STR_PAD_RIGHT: int
+```
+
+For `str_pad()`: pad on the right (the default).
+
+```php
+echo STR_PAD_RIGHT, "\n";
+```
+
+Output:
+
+```
+1
+```
+
+## STR_PAD_BOTH
+
+```php
+STR_PAD_BOTH: int
+```
+
+For `str_pad()`: pad both sides.
+
+```php
+echo STR_PAD_BOTH, "\n";
+```
+
+Output:
+
+```
+2
+```
+
+## ucwords
+
+```php
+ucwords(string $s): string
+```
+
+Upper-case the first letter of every word (ASCII a–z).
+
+```php
+echo ucwords("hello big world"), "\n";
+```
+
+Output:
+
+```
+Hello Big World
+```
+
+## strrev
+
+```php
+strrev(string $s): string
+```
+
+The string backwards, by what a reader sees as characters.
+
+```php
+echo strrev("stressed"), " ", strrev("ไทย"), "\n";
+```
+
+Output:
+
+```
+desserts ยทไ
+```
+
+- **PHP:** PHP reverses bytes, which breaks UTF-8 text; Pin reverses grapheme clusters (Thai marks stay on their letter).
+
+## is_numeric
+
+```php
+is_numeric(string $s): bool
+```
+
+Whether the text is a number PHP would accept (`12`, `-1.5`, `2e3`, spaces around).
+
+```php
+foreach (["12", " 1.5 ", "1e3", "12abc", ""] as $s) { echo is_numeric($s) ? "y" : "n"; }
+echo "\n";
+```
+
+Output:
+
+```
+yyynn
+```
+
+- Check with it, then read the value with `intval()` / `floatval()`.
+- **PHP:** For strings (PHP's also takes ints and floats).
 
 ## str_replace
 

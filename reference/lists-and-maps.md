@@ -4,6 +4,11 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 
 | | |
 |---|---|
+| [`array_slice`](#array_slice) | A copy of part of a list. |
+| [`array_merge`](#array_merge) | A new list: the items of `$a`, then those of `$b` (copied). |
+| [`array_reverse`](#array_reverse) | A copy of the list in reverse order. |
+| [`array_search`](#array_search) | The index of the first item equal to `$value`, or -1. |
+| [`array_unique`](#array_unique) | The list without repeated items (first ones kept, in order). |
 | [`in_array`](#in_array) | Whether the list holds the value (lists of int, float, bool, string). |
 | [`array_keys`](#array_keys) | The keys of a map, in insertion order. |
 | [`array_values`](#array_values) | The values of a map, in insertion order (copied). |
@@ -16,6 +21,104 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`isset`](#isset) | Whether a list index is in range, a map key exists, or a ?T variable is not null. |
 | [`array_key_exists`](#array_key_exists) | Same as `isset($m[$key])`. |
 | [`unset`](#unset) | Remove a map entry (nothing happens if it is missing). |
+
+## array_slice
+
+```php
+array_slice(list<T> $xs, int $offset, int $length = rest): list<T>
+```
+
+A copy of part of a list.
+
+```php
+echo json_encode(array_slice([1, 2, 3, 4, 5], 1, 2)), json_encode(array_slice([1, 2, 3, 4, 5], -2)), "\n";
+```
+
+Output:
+
+```
+[2,3][4,5]
+```
+
+- `substr()`'s rules for negative values, counted in items. The items are copied.
+
+## array_merge
+
+```php
+array_merge(list<T> $a, list<T> $b): list<T>
+```
+
+A new list: the items of `$a`, then those of `$b` (copied).
+
+```php
+echo json_encode(array_merge([1, 2], [3])), "\n";
+```
+
+Output:
+
+```
+[1,2,3]
+```
+
+- **PHP:** Two lists of one type (no maps, no more than two).
+
+## array_reverse
+
+```php
+array_reverse(list<T> $xs): list<T>
+```
+
+A copy of the list in reverse order.
+
+```php
+echo json_encode(array_reverse(["a", "b", "c"])), "\n";
+```
+
+Output:
+
+```
+["c","b","a"]
+```
+
+## array_search
+
+```php
+array_search(T $value, list<T> $xs): int
+```
+
+The index of the first item equal to `$value`, or -1.
+
+```php
+echo array_search("b", ["a", "b"]), " ", array_search(9, [1, 2]), "\n";
+```
+
+Output:
+
+```
+1 -1
+```
+
+- **PHP:** PHP returns `false` when not found; Pin returns `-1` (as `strpos`). Strict comparison.
+
+## array_unique
+
+```php
+array_unique(list<T> $xs): list<T>
+```
+
+The list without repeated items (first ones kept, in order).
+
+```php
+echo json_encode(array_unique(["b", "a", "b", "c", "a"])), "\n";
+```
+
+Output:
+
+```
+["b","a","c"]
+```
+
+- Lists of int, float, bool or string.
 
 ## in_array
 
