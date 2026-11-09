@@ -8,6 +8,7 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`http_status`](#http_status) | Set the status code of the current response (default 200). |
 | [`request_header`](#request_header) | The value of a request header (name matched without case), or `""` when absent. |
 | [`request_has_header`](#request_has_header) | Whether the request has the header, also when its value is empty. |
+| [`request_ip`](#request_ip) | The client's IP address (the other end of the connection). |
 | [`response_header`](#response_header) | Add a header to the response (for example `Content-Type`, `Location`, `Cache-Control`, `Set-Cookie`). |
 | [`url_path`](#url_path) | The request path without its query string. |
 | [`query_param`](#query_param) | One value from the query string, decoded, or `""`. |
@@ -99,6 +100,27 @@ serve(8080, "handle");
 ```
 
 (Starts a server; not run in the docs.)
+
+## request_ip
+
+```php
+request_ip(): string
+```
+
+The client's IP address (the other end of the connection).
+
+```php
+function handle(string $method, string $path, string $body): string {
+    return json_encode(["you" => request_ip()]);        // {"you":"203.0.113.7"}
+}
+serve(8080, "handle");
+```
+
+(Starts a server; not run in the docs.)
+
+- IPv4 as `"203.0.113.7"`, IPv6 as `"2001:db8::1"`; `""` outside a request.
+- Behind a proxy (Caddy for https, design/tls.md) this is the proxy's address, usually `127.0.0.1`; the client's is then in `X-Forwarded-For`, which only a proxy you run may be trusted to set (Tack's `client_ip()` does that).
+- **PHP:** `$_SERVER['REMOTE_ADDR']`.
 
 ## response_header
 
