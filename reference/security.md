@@ -5,6 +5,14 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | | |
 |---|---|
 | [`env`](#env) | An environment variable, or `""` when it is not set. |
+| [`filter_var`](#filter_var) | Check a value from a client: the value when it is valid, null when not. |
+| [`FILTER_VALIDATE_EMAIL`](#filter_validate_email) | For `filter_var()`: an email address (?string). |
+| [`FILTER_VALIDATE_URL`](#filter_validate_url) | For `filter_var()`: a URL with a scheme and host (?string). |
+| [`FILTER_VALIDATE_IP`](#filter_validate_ip) | For `filter_var()`: an IPv4 or IPv6 address (?string). |
+| [`FILTER_VALIDATE_INT`](#filter_validate_int) | For `filter_var()`: an int (?int). |
+| [`FILTER_VALIDATE_FLOAT`](#filter_validate_float) | For `filter_var()`: a number (?float). |
+| [`FILTER_VALIDATE_BOOL`](#filter_validate_bool) | For `filter_var()`: yes/no, on/off, true/false, 1/0 (?bool). |
+| [`FILTER_VALIDATE_BOOLEAN`](#filter_validate_boolean) | For `filter_var()`: the same as FILTER_VALIDATE_BOOL. |
 | [`hash`](#hash) | SHA-256 of a string, as 64 lowercase hex characters. |
 | [`hash_hmac`](#hash_hmac) | HMAC-SHA256 of `$data` with `$key`, as hex: a signature only someone with the key can make. |
 | [`hash_equals`](#hash_equals) | Compare two strings in a time that does not depend on where they differ. |
@@ -34,6 +42,158 @@ not set
 - Read secrets from here (database URLs, API keys, signing keys), never from string literals: literals end up in git and in the binary.
 - Read once per request is fine (it is cheap); a name containing a zero byte gives `""`.
 - **PHP:** `getenv('NAME')`, but `""` instead of `false` when unset.
+
+## filter_var
+
+```php
+filter_var(string $value, int $filter): ?T
+```
+
+Check a value from a client: the value when it is valid, null when not.
+
+```php
+echo filter_var("ann@example.com", FILTER_VALIDATE_EMAIL) ?? "bad", " ", filter_var("ann@", FILTER_VALIDATE_EMAIL) ?? "bad", "\n";
+$age = filter_var(" 42 ", FILTER_VALIDATE_INT);
+echo $age === null ? "not a number" : strval($age + 1), "\n";
+```
+
+Output:
+
+```
+ann@example.com bad
+43
+```
+
+- `FILTER_VALIDATE_EMAIL`, `_URL`, `_IP` give `?string`; `_INT` `?int` (no leading zeros, within 64 bits, spaces around allowed); `_FLOAT` `?float`; `_BOOL` `?bool` (`yes on true 1` / `no off false 0 ""`).
+- The filter must be one of these constants written in the call (the result type depends on it).
+- Email: ASCII addresses with a dotted domain, as PHP's default (no Unicode addresses).
+- **PHP:** PHP returns `false` where Pin gives null; no options or flags argument.
+
+## FILTER_VALIDATE_EMAIL
+
+```php
+FILTER_VALIDATE_EMAIL: int
+```
+
+For `filter_var()`: an email address (?string).
+
+```php
+echo FILTER_VALIDATE_EMAIL > 0 ? "a filter" : "", "\n";
+```
+
+Output:
+
+```
+a filter
+```
+
+## FILTER_VALIDATE_URL
+
+```php
+FILTER_VALIDATE_URL: int
+```
+
+For `filter_var()`: a URL with a scheme and host (?string).
+
+```php
+echo FILTER_VALIDATE_URL > 0 ? "a filter" : "", "\n";
+```
+
+Output:
+
+```
+a filter
+```
+
+## FILTER_VALIDATE_IP
+
+```php
+FILTER_VALIDATE_IP: int
+```
+
+For `filter_var()`: an IPv4 or IPv6 address (?string).
+
+```php
+echo FILTER_VALIDATE_IP > 0 ? "a filter" : "", "\n";
+```
+
+Output:
+
+```
+a filter
+```
+
+## FILTER_VALIDATE_INT
+
+```php
+FILTER_VALIDATE_INT: int
+```
+
+For `filter_var()`: an int (?int).
+
+```php
+echo FILTER_VALIDATE_INT > 0 ? "a filter" : "", "\n";
+```
+
+Output:
+
+```
+a filter
+```
+
+## FILTER_VALIDATE_FLOAT
+
+```php
+FILTER_VALIDATE_FLOAT: int
+```
+
+For `filter_var()`: a number (?float).
+
+```php
+echo FILTER_VALIDATE_FLOAT > 0 ? "a filter" : "", "\n";
+```
+
+Output:
+
+```
+a filter
+```
+
+## FILTER_VALIDATE_BOOL
+
+```php
+FILTER_VALIDATE_BOOL: int
+```
+
+For `filter_var()`: yes/no, on/off, true/false, 1/0 (?bool).
+
+```php
+echo FILTER_VALIDATE_BOOL > 0 ? "a filter" : "", "\n";
+```
+
+Output:
+
+```
+a filter
+```
+
+## FILTER_VALIDATE_BOOLEAN
+
+```php
+FILTER_VALIDATE_BOOLEAN: int
+```
+
+For `filter_var()`: the same as FILTER_VALIDATE_BOOL.
+
+```php
+echo FILTER_VALIDATE_BOOLEAN > 0 ? "a filter" : "", "\n";
+```
+
+Output:
+
+```
+a filter
+```
 
 ## hash
 

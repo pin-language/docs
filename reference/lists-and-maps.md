@@ -6,6 +6,8 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 |---|---|
 | [`array_map`](#array_map) | A new list: the function applied to each item. |
 | [`array_filter`](#array_filter) | A new list of the items the function keeps. |
+| [`array_key_first`](#array_key_first) | The first key of a map, or null when it is empty. |
+| [`array_key_last`](#array_key_last) | The last key of a map, or null when it is empty. |
 | [`ksort`](#ksort) | Sort a map by its keys, in place. |
 | [`krsort`](#krsort) | Sort a map by its keys, largest first, in place. |
 | [`asort`](#asort) | Sort a map by its values (int, float, bool or string), keeping each key with its value. |
@@ -78,6 +80,42 @@ Output:
 
 - `$keep` names a function of the same file `(T $x): bool`. The kept items are copied, and the new list is renumbered from 0 (PHP keeps the old keys).
 - **PHP:** PHP keeps the original keys; Pin's result is a list numbered from 0.
+
+## array_key_first
+
+```php
+array_key_first(map<K,V> $m): ?K
+```
+
+The first key of a map, or null when it is empty.
+
+```php
+echo array_key_first(["b" => 2, "a" => 1]) ?? "none", "\n";
+```
+
+Output:
+
+```
+b
+```
+
+## array_key_last
+
+```php
+array_key_last(map<K,V> $m): ?K
+```
+
+The last key of a map, or null when it is empty.
+
+```php
+echo array_key_last([3 => "c", 7 => "g"]) ?? -1, "\n";
+```
+
+Output:
+
+```
+7
+```
 
 ## ksort
 

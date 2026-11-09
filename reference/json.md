@@ -4,6 +4,7 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 
 | | |
 |---|---|
+| [`json_validate`](#json_validate) | Whether the text is valid JSON. |
 | [`JSON_PRETTY_PRINT`](#json_pretty_print) | For `json_encode($v, JSON_PRETTY_PRINT)`: indented output, as PHP. |
 | [`JSON_UNESCAPED_SLASHES`](#json_unescaped_slashes) | Accepted for PHP code; Pin never escapes `/`. |
 | [`JSON_UNESCAPED_UNICODE`](#json_unescaped_unicode) | Accepted for PHP code; Pin writes UTF-8 as it is. |
@@ -18,6 +19,26 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`json_int`](#json_int) | A top-level integer value, or 0. |
 | [`json_float`](#json_float) | A top-level number as a float, or 0.0. |
 | [`json_bool`](#json_bool) | Whether a top-level value is `true`. |
+
+## json_validate
+
+```php
+json_validate(string $json): bool
+```
+
+Whether the text is valid JSON.
+
+```php
+echo json_validate("{\"a\":[1,2]}") ? "valid" : "invalid", " ", json_validate("{a:1}") ? "valid" : "invalid", "\n";
+```
+
+Output:
+
+```
+valid invalid
+```
+
+- **PHP:** PHP 8.3's json_validate().
 
 ## JSON_PRETTY_PRINT
 

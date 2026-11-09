@@ -9,6 +9,14 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`rawurlencode`](#rawurlencode) | Percent-encode everything but `A-Z a-z 0-9 - _ . ~`, for a value inside a URL path or query. |
 | [`strlen`](#strlen) | Length of a string in bytes. |
 | [`substr`](#substr) | Part of a string, by byte offsets. |
+| [`ctype_digit`](#ctype_digit) | Whether every byte is a digit 0-9 (ASCII); false for "". |
+| [`ctype_alpha`](#ctype_alpha) | Whether every byte is a letter a-z / A-Z (ASCII); false for "". |
+| [`ctype_alnum`](#ctype_alnum) | Whether every byte is a letter or digit (ASCII); false for "". |
+| [`ctype_space`](#ctype_space) | Whether every byte is whitespace (space, tab, newlines) (ASCII); false for "". |
+| [`ctype_upper`](#ctype_upper) | Whether every byte is an upper-case letter A-Z (ASCII); false for "". |
+| [`ctype_lower`](#ctype_lower) | Whether every byte is a lower-case letter a-z (ASCII); false for "". |
+| [`ctype_xdigit`](#ctype_xdigit) | Whether every byte is a hex digit 0-9 a-f A-F (ASCII); false for "". |
+| [`nl2br`](#nl2br) | Insert `<br />` before each newline, for showing text in HTML. |
 | [`mb_str_split`](#mb_str_split) | Split into pieces of `$length` characters (code points). |
 | [`mb_strlen`](#mb_strlen) | Length in characters (Unicode code points). |
 | [`mb_substr`](#mb_substr) | Part of a string, counted in characters (code points). |
@@ -156,6 +164,153 @@ world|llo|ell|ell||
 - Out-of-range offsets give a shorter or empty string.
 - Offsets are bytes. One that falls inside a character (each Thai character is 3 bytes) **panics** instead of giving broken text; positions from `strpos()` never do. To count characters use `mb_substr()`, to shorten text for display `grapheme_substr()`.
 - **PHP:** The same, except that cutting a character in half panics instead of giving invalid UTF-8.
+
+## ctype_digit
+
+```php
+ctype_digit(string $s): bool
+```
+
+Whether every byte is a digit 0-9 (ASCII); false for "".
+
+```php
+echo ctype_digit("2024") ? "yes" : "no", " ", ctype_digit("20.5") ? "yes" : "no", "\n";
+```
+
+Output:
+
+```
+yes no
+```
+
+## ctype_alpha
+
+```php
+ctype_alpha(string $s): bool
+```
+
+Whether every byte is a letter a-z / A-Z (ASCII); false for "".
+
+```php
+echo ctype_alpha("Pin") ? "yes" : "no", " ", ctype_alpha("Pin8") ? "yes" : "no", "\n";
+```
+
+Output:
+
+```
+yes no
+```
+
+## ctype_alnum
+
+```php
+ctype_alnum(string $s): bool
+```
+
+Whether every byte is a letter or digit (ASCII); false for "".
+
+```php
+echo ctype_alnum("abc123") ? "yes" : "no", " ", ctype_alnum("abc-123") ? "yes" : "no", "\n";
+```
+
+Output:
+
+```
+yes no
+```
+
+## ctype_space
+
+```php
+ctype_space(string $s): bool
+```
+
+Whether every byte is whitespace (space, tab, newlines) (ASCII); false for "".
+
+```php
+echo ctype_space("  ") ? "yes" : "no", " ", ctype_space("a b") ? "yes" : "no", "\n";
+```
+
+Output:
+
+```
+yes no
+```
+
+## ctype_upper
+
+```php
+ctype_upper(string $s): bool
+```
+
+Whether every byte is an upper-case letter A-Z (ASCII); false for "".
+
+```php
+echo ctype_upper("ABC") ? "yes" : "no", " ", ctype_upper("AbC") ? "yes" : "no", "\n";
+```
+
+Output:
+
+```
+yes no
+```
+
+## ctype_lower
+
+```php
+ctype_lower(string $s): bool
+```
+
+Whether every byte is a lower-case letter a-z (ASCII); false for "".
+
+```php
+echo ctype_lower("abc") ? "yes" : "no", " ", ctype_lower("aBc") ? "yes" : "no", "\n";
+```
+
+Output:
+
+```
+yes no
+```
+
+## ctype_xdigit
+
+```php
+ctype_xdigit(string $s): bool
+```
+
+Whether every byte is a hex digit 0-9 a-f A-F (ASCII); false for "".
+
+```php
+echo ctype_xdigit("ff00") ? "yes" : "no", " ", ctype_xdigit("fg") ? "yes" : "no", "\n";
+```
+
+Output:
+
+```
+yes no
+```
+
+## nl2br
+
+```php
+nl2br(string $s): string
+```
+
+Insert `<br />` before each newline, for showing text in HTML.
+
+```php
+echo nl2br("line 1\nline 2"), "\n";
+```
+
+Output:
+
+```
+line 1<br />
+line 2
+```
+
+- Escape first: `nl2br(htmlspecialchars($text))`.
 
 ## mb_str_split
 
