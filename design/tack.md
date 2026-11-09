@@ -68,8 +68,8 @@ in the last section.
   to forget in a form; Bearer requests are not affected (browsers never add them). (3) `rate_limit($db, $key,
   $max, $window_seconds)` counts in the app's database with one upsert (`ON CONFLICT ... DO UPDATE ...
   RETURNING n`, the same SQL on SQLite 3.35+ and PostgreSQL), because Pin has no globals and the count must be
-  shared by threads and copies of the app; fixed windows, 429. Not built: client IP as a key (the runtime does
-  not expose the peer address), `Retry-After`. The shop example limits `/login` to 5 a minute per email and
+  shared by threads and copies of the app; fixed windows, 429. Client IP built after (`tack::client_ip()`: Pin's
+  `request_ip()`, and `X-Forwarded-For` only from a proxy on 127.0.0.1 / ::1). Not built: `Retry-After`. The shop example limits `/login` to 5 a minute per email and
   sets the cookie; its tests cover the cookie, both CSRF refusals and the 429.
 - **`db_all` / `db_one` as built (2026-11-09)** (the rest of T7): `list<C> $xs = db_all($db, $sql, $ps)`,
   `?C $x = db_one(...)`, the class from where the value goes (like `json_decode`). Built on `db_json` and the
