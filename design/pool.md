@@ -4,7 +4,11 @@
 framework ([tack.md](tack.md)) and for PostgreSQL. Differences from the text below, made while building:
 - K5: when the pool stays full for 5 s, `db_open()` **panics** (500 in a handler), not 503: `db_open` does not
   `throws`, and making it so would change every program. Waiting polls every 2 ms (yields to other tasks).
-- K6 (statement cache) is **not built**: the pool alone gave ~7×; measure again before adding it.
+- K6 (statement cache) is **not built**: the pool alone gave ~7×. Measured 2026-11-09 (M2, SQLite, a one-row
+  `SELECT ... WHERE id = ?`): prepare + step + finalize 1.98 µs, reset + step on a kept statement 0.37 µs — about
+  1.6 µs a query, ~3–4% of a request at 185k req/s on 8 threads. Not worth it yet against the new ways to get
+  memory wrong (a cached statement still held by an open `rows`, panics, connections closed while statements
+  live): decision rule memory safety > speed. Revisit if a profile shows prepare high.
 - `":memory:"`, `""` and `mode=memory` URIs are never pooled (each open must be a new, empty database).
 - K4 for SQLite allows PRAGMAs that only read or that change the file (`table_info(t)`, `user_version = 3`, …).
 - Measured after building (same setup as step 0): 181k–189k req/s, was 24.6k–26.0k.
