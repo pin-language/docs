@@ -56,7 +56,8 @@ echo $msg;         // fine
   tighter than unary minus and from the right (`-2 ** 2` is -4); int ** int is an int, a negative int exponent panics.
   `%` and `intdiv` follow PHP (round toward zero). Division by zero panics.
 - Compound: `+= -= *= /= %= .=`, `++`, `--`. `/=` needs a float variable.
-- Comparison: `== != < <= > >= === !==` (no implicit conversions between types).
+- Comparison: `== != < <= > >= === !==` (no implicit conversions between types), and `<=>` (-1, 0 or 1; for
+  `usort` comparisons: `return $a->price <=> $b->price;`).
 - Logic: `&& || !` — on `bool` only.
 - Bits (ints): `| & ^ ~ << >>` and `|= &= ^= <<= >>=`, with PHP 8's precedence (`&` binds looser than `==`, so
   write `($flags & 4) != 0`). A shift by 64 or more gives 0 (`>>` of a negative: -1); a negative shift panics.

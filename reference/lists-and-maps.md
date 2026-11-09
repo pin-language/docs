@@ -57,6 +57,7 @@ Output:
 ```
 
 - `$function` is the name of a function in the same file taking one `T` and giving any `R`; it cannot be `throws`. The compiler writes the loop: no callback at run time.
+- One-argument built-ins work by name too: `array_map("strtoupper", $names)`, `array_map("intval", $parts)`, `array_filter($xs, "ctype_digit")`.
 - **PHP:** `array_map('label', $xs)` with a function name (Pin has no closures yet); one list.
 
 ## array_filter
