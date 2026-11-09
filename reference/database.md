@@ -14,6 +14,8 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`db_string`](#db_string) | A column of the current row as text (NULL gives `""`). |
 | [`db_is_null`](#db_is_null) | Whether a column of the current row is NULL. |
 | [`db_json`](#db_json) | Run a SELECT and get all rows as a JSON array of objects. |
+| [`db_all`](#db_all) | Run a SELECT and get every row as an object of the class where the list goes. |
+| [`db_one`](#db_one) | Run a SELECT and get the first row as an object of the class where it goes, or null when there is none. |
 | [`db_last_id`](#db_last_id) | The id of the last row inserted on this connection. |
 | [`db_error`](#db_error) | Why the last `db_exec` returned -1, or `""`. |
 
@@ -272,6 +274,67 @@ Output:
 - Column names become keys; INTEGER, REAL, TEXT and NULL become JSON numbers, strings and `null`.
 - PostgreSQL: integer, float and numeric columns become numbers (`NaN` and `Infinity` strings), `bool` `true`/`false`, `json`/`jsonb` are included as they are, everything else (dates, uuid, text) a string.
 - The easiest way to answer an API request with query results — no loop, no string building.
+
+## db_all
+
+```php
+db_all(db $db, string $sql, list $params): list<T>
+```
+
+Run a SELECT and get every row as an object of the class where the list goes.
+
+```php
+class Item {
+    public function __construct(public int $id, public string $name, public ?int $qty = null) {}
+}
+$db = db_open(":memory:");
+db_exec($db, "CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT UNIQUE, qty INTEGER, price REAL)", []);
+db_exec($db, "INSERT INTO items (name, qty) VALUES ('tea', 2), ('cake', NULL)", []);
+list<Item> $items = db_all($db, "SELECT id, name, qty FROM items ORDER BY id", []);
+foreach ($items as $i) { echo $i->name, " ", $i->qty ?? 0, "\n"; }
+```
+
+Output:
+
+```
+tea 2
+cake 0
+```
+
+- The class comes from where the value goes: `list<Item> $xs = db_all(...)` or `return db_all(...)` from a function declared `: list<Item>`. Column names are the constructor's parameters (or the public properties); `?T` and parameters with a default may be missing, NULL gives null.
+- A row that does not fit (a missing or extra column, a wrong type, the constructor refuses it) is a bug in the program and **panics** (500 in a handler). Tack checks the columns against the class when you build.
+- SQLite has no booleans: read 0 / 1 into an `int`. Same SQL rules as `db_query()` (literal SQL, `?` values).
+- **PHP:** Like PDO's `fetchAll(PDO::FETCH_CLASS, Item::class)`, but typed and checked.
+
+## db_one
+
+```php
+db_one(db $db, string $sql, list $params): ?T
+```
+
+Run a SELECT and get the first row as an object of the class where it goes, or null when there is none.
+
+```php
+class Item {
+    public function __construct(public int $id, public string $name) {}
+}
+$db = db_open(":memory:");
+db_exec($db, "CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT UNIQUE, qty INTEGER, price REAL)", []);
+db_exec($db, "INSERT INTO items (name) VALUES ('tea')", []);
+?Item $t = db_one($db, "SELECT id, name FROM items WHERE name = ?", ["tea"]);
+?Item $x = db_one($db, "SELECT id, name FROM items WHERE name = ?", ["nope"]);
+echo $t?->name ?? "none", " ", $x?->name ?? "none", "\n";
+```
+
+Output:
+
+```
+tea none
+```
+
+- Write it as `?Item $i = db_one(...)`, then check: `if ($i === null) { throw error(404, "..."); }`.
+- Only the first row is read; add `LIMIT 1` when more could match. The same rules as `db_all()`.
+- **PHP:** Like PDO's `fetchObject()`, but typed: null instead of `false`.
 
 ## db_last_id
 

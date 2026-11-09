@@ -39,8 +39,8 @@ in the last section.
 - **M5 as built:** without compiler changes — the `tack` command finds every `db_exec` / `db_query` / `db_json`
   whose SQL is literal in the routes and their local modules and prepares it (`EXPLAIN`) against
   `migrations/*.sql` in an in-memory SQLite; also checks `?` against a literal value list. Migrations run at
-  start (table `tack_migrations`) and with `tack migrate`. Not built from T7: `db_all` / `db_one` into classes
-  (needs the compiler) and checks of SQL assembled in variables.
+  start (table `tack_migrations`) and with `tack migrate`. Not built from T7: checks of SQL assembled in variables
+  (`db_all` / `db_one` were built later, see below).
 - **PostgreSQL as built (2026-11-09)** (answers T7's last point): `{"database": {"env": "DATABASE_URL"}}` in
   tack.json — the URL stays in the environment (Pin's G7). Decisions:
   - **Checked on a real server, not with a SQL parser:** `tack check` connects with libpq (ctypes; the library
@@ -71,6 +71,14 @@ in the last section.
   shared by threads and copies of the app; fixed windows, 429. Not built: client IP as a key (the runtime does
   not expose the peer address), `Retry-After`. The shop example limits `/login` to 5 a minute per email and
   sets the cookie; its tests cover the cookie, both CSRF refusals and the 429.
+- **`db_all` / `db_one` as built (2026-11-09)** (the rest of T7): `list<C> $xs = db_all($db, $sql, $ps)`,
+  `?C $x = db_one(...)`, the class from where the value goes (like `json_decode`). Built on `db_json` and the
+  class's generated JSON reader, so no new reader code and the same rules (constructor parameters, `?T` and
+  defaults may be missing). A row that does not fit **panics** (500): it is the program's bug, not the client's.
+  `tack check` gets the column names from the database (SQLite: running the SELECT on the empty migrated
+  schema; PostgreSQL: `PQdescribePrepared`, nothing runs) and compares them with the class when the call's
+  value goes into a declared variable or a `return`: a missing needed column or an extra column is a build
+  error at its line. Examples: shop `GET /products/{id}`, notes `GET /notes/{id}`.
 - Speed gate, measured: `GET /` through Tack 221k–277k req/s vs a hand-written `serve()` 220k–260k (M2, load
   generator on the same machine): no difference beyond the noise.
 
