@@ -14,7 +14,7 @@ New to Pin? Start with the [language guide](../language.md). Writing Pin with an
 
 ## [Numbers](numbers.md)
 
-[`intdiv`](numbers.md#intdiv), [`sqrt`](numbers.md#sqrt), [`wrapping_add`](numbers.md#wrapping_add), [`wrapping_sub`](numbers.md#wrapping_sub), [`wrapping_mul`](numbers.md#wrapping_mul), [`PHP_INT_MAX`](numbers.md#php_int_max), [`PHP_INT_MIN`](numbers.md#php_int_min)
+[`intdiv`](numbers.md#intdiv), [`sqrt`](numbers.md#sqrt), [`wrapping_add`](numbers.md#wrapping_add), [`wrapping_sub`](numbers.md#wrapping_sub), [`wrapping_mul`](numbers.md#wrapping_mul), [`time`](numbers.md#time), [`PHP_INT_MAX`](numbers.md#php_int_max), [`PHP_INT_MIN`](numbers.md#php_int_min)
 
 ## [Conversions](conversions.md)
 

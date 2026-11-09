@@ -9,6 +9,7 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`wrapping_add`](#wrapping_add) | `$a + $b`, wrapping around on 64-bit overflow on purpose. |
 | [`wrapping_sub`](#wrapping_sub) | `$a - $b` with 64-bit wrap-around. |
 | [`wrapping_mul`](#wrapping_mul) | `$a * $b` with 64-bit wrap-around. |
+| [`time`](#time) | The current time as seconds since 1970-01-01 00:00 UTC (Unix time). |
 | [`PHP_INT_MAX`](#php_int_max) | The largest int, 9223372036854775807. |
 | [`PHP_INT_MIN`](#php_int_min) | The smallest int, -9223372036854775808. |
 
@@ -110,6 +111,29 @@ Output:
 ```
 99599260821814035
 ```
+
+## time
+
+```php
+time(): int
+```
+
+The current time as seconds since 1970-01-01 00:00 UTC (Unix time).
+
+```php
+$expires = time() + 3600;               // one hour from now
+echo $expires > time() ? "valid\n" : "expired\n";
+```
+
+Output:
+
+```
+valid
+```
+
+- The system's wall clock: it moves when the clock is set, so use it for expiry times and timestamps, not to measure how long something took.
+- Keep times as Unix seconds in the database (`INTEGER` / `BIGINT`): the same on SQLite and PostgreSQL.
+- **PHP:** `time()`. No `date()` / `microtime()` yet.
 
 ## PHP_INT_MAX
 

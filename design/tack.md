@@ -1,9 +1,9 @@
 # Tack — the web framework for Pin
 
-**Status (2026-11-08):** **M1–M6 built** in github.com/pin-language/tack (package `tack.pn`, the `tack`
-command, `examples/shop`, CI on Linux and macOS); needs Pin from `next`. Prerequisites P1, P2, P5 and
-parameter defaults are built (table below); null and the PostgreSQL driver are not. Open questions for the
-owner are in the last section.
+**Status (2026-11-09):** **M1–M6 built** in github.com/pin-language/tack (package `tack.pn`, the `tack`
+command, `examples/shop`, CI on Linux and macOS); needs Pin from `next`. Prerequisites P1–P5 are built
+(table below); Tack runs on SQLite or PostgreSQL (see "PostgreSQL as built"). Open questions for the owner are
+in the last section.
 
 ### M1 as built (decisions made while building; they change the text below where it differs)
 - **The generator is in the `tack` command, not in the Pin compiler** (answers Q2 for M1): it reads `routes/`
@@ -41,6 +41,25 @@ owner are in the last section.
   `migrations/*.sql` in an in-memory SQLite; also checks `?` against a literal value list. Migrations run at
   start (table `tack_migrations`) and with `tack migrate`. Not built from T7: `db_all` / `db_one` into classes
   (needs the compiler) and checks of SQL assembled in variables.
+- **PostgreSQL as built (2026-11-09)** (answers T7's last point): `{"database": {"env": "DATABASE_URL"}}` in
+  tack.json — the URL stays in the environment (Pin's G7). Decisions:
+  - **Checked on a real server, not with a SQL parser:** `tack check` connects with libpq (ctypes; the library
+    Pin loads), and in one transaction makes a schema, applies the migrations and `PQprepare`s every SQL
+    literal (with `?` rewritten to `$n` as Pin does), then rolls back: nothing is written, so a development
+    database is safe to use. PostgreSQL's planner checks types too (`text = integer`), which SQLite cannot.
+    No server: an error that names the variable; `TACK_NO_SQL_CHECK=1` builds without the check (said on
+    stderr). `TACK_CHECK_DATABASE` overrides the URL.
+  - `db_last_id()` in a PostgreSQL project is a build error (Pin's compiler cannot see the URL; tack can):
+    `INSERT ... RETURNING id`.
+  - `tack test`: a new schema per run (`PGOPTIONS=-c search_path=...`, read by libpq), dropped afterwards;
+    a URL with `options=` is refused, because it would override that and the tests would run in the app's schema.
+  - Migrations at start: one transaction per file holding `pg_advisory_xact_lock` (a transaction lock, allowed
+    by the pool rule K4), so copies of the app starting together apply each file once (tested with two).
+    Statements are split at `;` outside quotes, comments and `$$` bodies.
+  - Sessions used SQLite's `strftime('%s','now')`; they now use Pin's new `time()` (Unix seconds as a
+    parameter), the same SQL on both. Columns `BIGINT` (existing SQLite tables keep working).
+  - Tests: `tests/pg/notes` (sessions, `RETURNING`, `ON CONFLICT`, a G6 filter, a SQL function) and
+    `tests/pg/bad/*`, run when `TACK_TEST_POSTGRES` is set — CI on Linux (service container) and macOS (Homebrew).
 - Speed gate, measured: `GET /` through Tack 221k–277k req/s vs a hand-written `serve()` 220k–260k (M2, load
   generator on the same machine): no difference beyond the noise.
 
@@ -53,8 +72,8 @@ every web app needs, framework or not.
 |---|---|---|
 | P1 | **resources that outlive a request** ([pool.md](pool.md)) — **built** (SQLite, 2026-10-26) | no globals means a new connection per request; fine for SQLite, far too slow for PostgreSQL |
 | P2 | `json_decode` into a class — **built** (2026-10-26) | T3 validation, T8 typed client calls, class return values |
-| P3 | `null` (null.md) and parameter defaults — **defaults built** (2026-10-26); null has a build plan, not built | optional query values and JSON fields (defaults cover these now) |
-| P4 | PostgreSQL on the pool, plus a safe way to build queries with optional filters and sorting — **designed** ([postgres.md](postgres.md)) | the literal-SQL rule allows no search/filter endpoints today; T7's build-time check only covers SQLite |
+| P3 | `null` (null.md) and parameter defaults — **built** (defaults 2026-10-26; null steps 1–5 2026-11-08/09) | optional query values and JSON fields (defaults cover these now) |
+| P4 | PostgreSQL on the pool, plus a safe way to build queries with optional filters and sorting — **built** (2026-11-08, [postgres.md](postgres.md)); in Tack 2026-11-09 | the literal-SQL rule allows no search/filter endpoints today; T7's build-time check covered only SQLite (now both) |
 | P5 | crypto built-ins (random tokens, sha256/HMAC, password hashing) — **built** (2026-10-26) | real auth (T4); packages cannot contain C |
 
 Then build **M1 only** and use it for one real app before deciding which of M2–M6 to build.
@@ -265,7 +284,8 @@ User $u = try db_one($db, "SELECT id, name FROM users WHERE id = ?", [strval($id
   package) and prepares every SQL literal: an unknown table or column, a wrong number of `?`, or selected
   columns that do not match the target class's properties are build errors.
 - Prior art: sqlx (Rust) checks queries against a database at compile time; sqlc (Go) generates code from SQL.
-- PostgreSQL (HANDOFF §4 item 7) is harder: checking needs a running server or a SQL parser. Decide then.
+- PostgreSQL (HANDOFF §4 item 7) is harder: checking needs a running server or a SQL parser. Decided
+  2026-11-09: a running server, in a rolled-back transaction (see "PostgreSQL as built").
 
 ### T8 — the API describes itself: OpenAPI and MCP
 
