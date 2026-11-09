@@ -79,6 +79,11 @@ in the last section.
   schema; PostgreSQL: `PQdescribePrepared`, nothing runs) and compares them with the class when the call's
   value goes into a declared variable or a `return`: a missing needed column or an extra column is a build
   error at its line. Examples: shop `GET /products/{id}`, notes `GET /notes/{id}`.
+- **Fresh-agent test 2 (Sonnet, README + AI guide only, 2026-11-09):** a blog API with sign-up / login (cookie and
+  token), rate limits per email and per client IP, `db_one` into a class, an author-only DELETE with the CSRF
+  check, and tests for each. No compile errors at all; 7/7 tests after fixing an off-by-one in its own test (it
+  had not counted an earlier login against the limit). README gaps it named were fixed: test headers, one test
+  database per run, public and signed-in methods on one path, the UNIQUE → 409 pattern, quoting `[id]` paths.
 - Speed gate, measured: `GET /` through Tack 221k–277k req/s vs a hand-written `serve()` 220k–260k (M2, load
   generator on the same machine): no difference beyond the noise.
 
