@@ -114,10 +114,16 @@ What steps 1–4 do, and where they differ from the rules above.
   `if ($u === null) { return; }` narrows the rest of the function and `while ($u === null) { ... }` narrows after
   the loop. Assigning a `?T` value, a move, or lending the variable with `&` to a `?T &` parameter removes it; a
   loop removes every variable it may write before the first round (the next round may see null again).
-- **Not built from N2: narrowing a property.** `if ($u->email !== null) { strlen($u->email); }` is still an error;
-  the message says to read it into a variable first (`$e = $u->email;`), which for lists and objects is a borrow,
-  not a copy. Tracking "unchanged since the check" for paths is the part that needs the borrow machinery, and it is
-  not needed to write correct code.
+- **Narrowing a property (built 2026-11-09):** a property path from a variable (`$u->email`, `$u->addr->zip`,
+  `$this->email`) is a key in the same `Flow.nonnull` set (`"$u->email"`), so paths merge like variables. It
+  is forgotten by anything that may change it, all of which goes through `mutating(root, props)`: storing into
+  an overlapping path (`$u->addr = ...` keeps `$u->email`), a changing method on `$u` (R6 already infers which
+  methods change `$this`), `&` loans, `sort` / `unset`, moves; and by assigning the variable itself. A loop
+  forgets, before its first round, every path of a variable its body changes in any of these ways (any method
+  call counts there). Ownership is what makes this sound: an object has one owner and borrows are read-only,
+  so no other name can change it in between. Storing a non-null value (`$u->email = "a@b.c";`) narrows the path
+  too. A call result (`find()->email`) still does not carry over. The IR of all 60 existing programs is the same.
+  Tests: `tests/null_narrow_fields.pn`; errors `tests/errors/null_field_changed.pn`, `null_field_loop.pn`.
 - **`=== null` on a value that can never be null is a compile error** (always true or always false), as is `?->`
   on a non-null value. This catches PHP habits that hide a type mistake.
 - **`?->`** gives `?T` (`?string` for a string property, `?Address` for an object one). A field or method that

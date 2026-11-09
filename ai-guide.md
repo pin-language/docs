@@ -197,8 +197,11 @@ echo json_encode($o), "\n";               // {"id":1,"items":[{"name":"tea","pri
   `?User $u = null;`. `?T` properties start as null, so `__construct` need not set them.
 - Before using a `?T` **variable**, check it: inside `if ($u !== null) { ... }`, after
   `if ($u === null) { return ...; }`, on the right of `$u !== null && ...`, and in `isset($u) ? ... : ...` it
-  counts as `T`. Assigning it again (or lending it with `&` to a `?T &` parameter) means checking again. A check
-  on a **property** or call result does not carry over: `$e = $u->email; if ($e !== null) { ... }`.
+  counts as `T`. Assigning it again (or lending it with `&` to a `?T &` parameter) means checking again. A
+  **property** checks the same way (`if ($u->email !== null) { strlen($u->email); }`, also
+  `$u->addr !== null && $u->addr->zip !== null`) until `$u` is changed: assigning that property, a method that
+  changes `$u`, lending `$u` with `&`, or a loop that does any of these. A call result does not carry over: put
+  it in a variable.
 - `$u?->name` (null if `$u` is null; gives `?T`), `$x ?? "default"`, and
   `$u = find($id) ?? throw error(404, "not found");` (a `User` from here on). `=== null` on a value that is
   never null is a compile error. `json_encode` writes `null`; `json_decode` gives null for a `?T` field that is
