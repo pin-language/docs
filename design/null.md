@@ -1,9 +1,8 @@
 # Pin — Null
 
-**Status (2026-11-09):** steps 1–5 of the build plan are **built**: `?string`, `?list<T>`, `?map<K,V>` and
+**Status (2026-11-09):** all six steps of the build plan are **built**: `?string`, `?list<T>`, `?map<K,V>` and
 `?ClassName` (2026-11-08); checks that narrow (N2, for variables); `?->`, `??`, `?? throw` (N3, N4); JSON (N8);
-`?int`, `?float`, `?bool` (step 5, 2026-11-09). Step 6 (`list<?T>`, `map<K,?T>`) is not built and is a compile
-error that says so.
+`?int`, `?float`, `?bool` (step 5) and `list<?T>`, `map<K,?T>` (step 6, both 2026-11-09).
 See "As built" at the end. N5 (every property set when the constructor ends) was built in 0.5 with classes.
 
 Decision rule: memory safety > speed > clarity > looking like PHP.
@@ -60,7 +59,7 @@ A constructor may not call `$this` methods before every property is set.
 |---|---|---|
 | `?User`, `?string`, `?list<T>`, `?map<K,V>` | a pointer; null = 0 | none |
 | `?int`, `?float`, `?bool` in variables, arguments, returns | `{i64, i1}` in two registers | tiny |
-| `list<?int>` and similar | the data plus a separate bitmap, 1 bit per item | +1.6% memory |
+| `list<?int>` and similar | the data plus a separate bitmap, 1 bit per item (built differently: 16-byte items, see "Step 6 as built") | +1.6% memory |
 | `map<K, ?V>` | a bit in the existing entry | none |
 
 ### N7 — `?T` or `throws`?
@@ -166,3 +165,26 @@ What steps 1–4 do, and where they differ from the rules above.
   8 bytes; compile error). `strval()` / `intval()` of a `?int` is an error that says to check or use `??`.
 - Tests: `tests/null_scalars.pn`, `null_scalar_class.pn`, `null_scalar_flow.pn`; compile errors
   `tests/errors/null_scalar.pn`, `null_scalar_go.pn`, `null_scalar_strval.pn`. ASAN + UBSAN clean on macOS.
+
+### Step 6 as built (2026-11-09)
+
+- **Layout (changes N6 for lists):** `list<?string>`, `list<?User>`, `list<?list<int>>` hold pointers with null = 0.
+  `list<?int>` / `list<?float>` items are the same 16-byte pair a variable holds (`{ i64, i1 }`), `list<?bool>`
+  2 bytes — **not the separate bitmap** N6 proposed. Reason (clarity, memory safety): an item is read and written
+  exactly like a variable, with no second array to keep in step on push, copy, `&` and JSON; the cost is memory
+  for these new lists only (16 bytes an item instead of ~8.1), nothing for existing code. `map<K,?int>` /
+  `?float` / `?bool`: the value in the entry's slot and null as a bit in the entry's existing "alive" word (N6:
+  "a bit in the existing entry"); value kinds 8–10 in `runtime/values.c`.
+- **Benchmarks:** the IR of all 55 existing tests, examples and benchmark programs is the same as before step 6
+  apart from one new `declare` line, so their numbers cannot move.
+- `$xs[$i]` / `$m[$k]` on `?T` items is `?T`: check it in a variable or use `??`. `$xs[$i] ?? 0` and
+  `$m[$k] ?? 0` give the default when the item is missing **or null** (PHP's meaning). `isset($m[$k])` /
+  `isset($xs[$i])` are false for a null item, as in PHP; `array_key_exists()` is true.
+- `[1, null, 3]` is `list<?int>` without a declaration; `["a" => 1, "b" => null]` is `map<string,?int>` when the
+  other values are literals (else write the type). `fill($n, null)` makes a list of nulls where a `list<?T>` goes.
+- Free, copy and JSON go through generated per-item functions for `?string` items (null stays null), as for
+  objects. `json_decode` accepts `null` items in `list<?T>` / `map<string,?T>` properties.
+- **Not built:** `foreach ($m as &$v)` over `map<K,?int|?float|?bool>` (compile error: assign by key);
+  `sort()`, `rsort()` and `implode()` on `?T` items (compile errors: they need items that are never null).
+- Tests: `tests/null_items.pn`, `null_items_class.pn`, `null_items_more.pn`; compile errors
+  `tests/errors/null_in_list.pn` (an unchecked item), `null_in_map.pn` (`&` over `map<K,?int>`).

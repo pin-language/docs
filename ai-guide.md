@@ -191,7 +191,8 @@ echo json_encode($o), "\n";               // {"id":1,"items":[{"name":"tea","pri
 - No inheritance, interfaces or static members. A class cannot hold itself directly (use `?Node`,
   `list<Node>` or an id). `==` does not compare objects: compare properties.
 - **null**: only a `?T` type can be null: `?int`, `?float`, `?bool`, `?string`, `?list<T>`, `?map<K,V>`,
-  `?ClassName` (no `list<?T>`/`map<K,?T>` yet, and `go` tasks cannot take or give `?int`/`?float`/`?bool`).
+  `?ClassName`, and items: `list<?int>`, `map<string,?string>` (`go` tasks cannot take or give
+  `?int`/`?float`/`?bool` themselves; a list of them is fine).
   `return 5;` from a `?int` function and `?float $f = 3;` just work. A new variable needs its type to start null:
   `?User $u = null;`. `?T` properties start as null, so `__construct` need not set them.
 - Before using a `?T` **variable**, check it: inside `if ($u !== null) { ... }`, after
@@ -202,6 +203,10 @@ echo json_encode($o), "\n";               // {"id":1,"items":[{"name":"tea","pri
   `$u = find($id) ?? throw error(404, "not found");` (a `User` from here on). `=== null` on a value that is
   never null is a compile error. `json_encode` writes `null`; `json_decode` gives null for a `?T` field that is
   `null` or missing.
+- **Items that may be null:** `list<?int> $xs = [1, null, 3];` (`[1, null]` alone is already `list<?int>`),
+  `$xs[] = null;`, `fill(3, null)`. `$xs[$i]` is `?int`: put it in a variable and check it, or write
+  `$xs[$i] ?? 0` (the default also when the item is missing). `isset($m[$k])` is false for a null value, as in
+  PHP; `array_key_exists($k, $m)` is true. `sort()` / `implode()` need items that are never null.
 - **An optional JSON field:** make it a `?T` constructor parameter with `= null`:
   `class NewUser { public function __construct(public string $name, public ?string $email = null) {} }`.
   `json_decode` fills a class with a constructor **through the constructor's parameters only**: a `?T` property
