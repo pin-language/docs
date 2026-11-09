@@ -52,7 +52,8 @@ echo $msg;         // fine
 
 ## Operators
 
-- Arithmetic: `+ - * %`, `/` (always gives a float, like PHP), `intdiv($a, $b)` for int division.
+- Arithmetic: `+ - * % **`, `/` (always gives a float, like PHP), `intdiv($a, $b)` for int division. `**` binds
+  tighter than unary minus and from the right (`-2 ** 2` is -4); int ** int is an int, a negative int exponent panics.
   `%` and `intdiv` follow PHP (round toward zero). Division by zero panics.
 - Compound: `+= -= *= /= %= .=`, `++`, `--`. `/=` needs a float variable.
 - Comparison: `== != < <= > >= === !==` (no implicit conversions between types).

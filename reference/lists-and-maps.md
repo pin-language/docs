@@ -6,6 +6,14 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 |---|---|
 | [`array_map`](#array_map) | A new list: the function applied to each item. |
 | [`array_filter`](#array_filter) | A new list of the items the function keeps. |
+| [`ksort`](#ksort) | Sort a map by its keys, in place. |
+| [`krsort`](#krsort) | Sort a map by its keys, largest first, in place. |
+| [`asort`](#asort) | Sort a map by its values (int, float, bool or string), keeping each key with its value. |
+| [`arsort`](#arsort) | Sort a map by its values, largest first, keeping the keys. |
+| [`range`](#range) | The ints from `$from` to `$to` (counting down when `$from` is larger). |
+| [`array_count_values`](#array_count_values) | How many times each value occurs, in first-seen order. |
+| [`array_flip`](#array_flip) | Values become keys and keys values (values must be int or string). |
+| [`array_combine`](#array_combine) | A map from a list of keys and a list of values. |
 | [`usort`](#usort) | Sort a list in place with your own comparison function. |
 | [`array_pop`](#array_pop) | Take the last item out of the list, or null when it is empty. |
 | [`array_shift`](#array_shift) | Take the first item out of the list, or null when it is empty. |
@@ -70,6 +78,171 @@ Output:
 
 - `$keep` names a function of the same file `(T $x): bool`. The kept items are copied, and the new list is renumbered from 0 (PHP keeps the old keys).
 - **PHP:** PHP keeps the original keys; Pin's result is a list numbered from 0.
+
+## ksort
+
+```php
+ksort(map<K,V> $m): void
+```
+
+Sort a map by its keys, in place.
+
+```php
+map<string,int> $m = ["b" => 2, "a" => 1];
+ksort($m);
+echo json_encode($m), "\n";
+```
+
+Output:
+
+```
+{"a":1,"b":2}
+```
+
+- Stable, as PHP 8. `krsort()` sorts the other way.
+
+## krsort
+
+```php
+krsort(map<K,V> $m): void
+```
+
+Sort a map by its keys, largest first, in place.
+
+```php
+map<int,string> $m = [1 => "a", 3 => "c"];
+krsort($m);
+echo json_encode($m), "\n";
+```
+
+Output:
+
+```
+{"3":"c","1":"a"}
+```
+
+## asort
+
+```php
+asort(map<K,V> $m): void
+```
+
+Sort a map by its values (int, float, bool or string), keeping each key with its value.
+
+```php
+map<string,int> $votes = ["tea" => 5, "coffee" => 9, "milk" => 2];
+asort($votes);
+echo json_encode($votes), "\n";
+```
+
+Output:
+
+```
+{"milk":2,"tea":5,"coffee":9}
+```
+
+- `arsort()` sorts the other way (largest first).
+
+## arsort
+
+```php
+arsort(map<K,V> $m): void
+```
+
+Sort a map by its values, largest first, keeping the keys.
+
+```php
+map<string,int> $votes = ["tea" => 5, "coffee" => 9, "milk" => 2];
+arsort($votes);
+echo json_encode(array_keys($votes)), "\n";
+```
+
+Output:
+
+```
+["coffee","tea","milk"]
+```
+
+## range
+
+```php
+range(int $from, int $to, int $step = 1): list<int>
+```
+
+The ints from `$from` to `$to` (counting down when `$from` is larger).
+
+```php
+echo json_encode(range(1, 5)), json_encode(range(10, 0, 5)), "\n";
+foreach (range(1, 3) as $i) { echo $i; }
+echo "\n";
+```
+
+Output:
+
+```
+[1,2,3,4,5][10,5,0]
+123
+```
+
+- A step of 0 panics. Ints only (a for loop for floats).
+
+## array_count_values
+
+```php
+array_count_values(list<int|string> $xs): map<T,int>
+```
+
+How many times each value occurs, in first-seen order.
+
+```php
+echo json_encode(array_count_values(["tea", "milk", "tea"])), "\n";
+```
+
+Output:
+
+```
+{"tea":2,"milk":1}
+```
+
+## array_flip
+
+```php
+array_flip(map<K,V> $m): map<V,K>
+```
+
+Values become keys and keys values (values must be int or string).
+
+```php
+echo json_encode(array_flip(["a" => "x", "b" => "y"])), "\n";
+```
+
+Output:
+
+```
+{"x":"a","y":"b"}
+```
+
+- When two keys have the same value, the later one wins (as PHP).
+
+## array_combine
+
+```php
+array_combine(list<K> $keys, list<V> $values): map<K,V>
+```
+
+A map from a list of keys and a list of values.
+
+```php
+echo json_encode(array_combine(["id", "qty"], [7, 2])), "\n";
+```
+
+Output:
+
+```
+{"id":7,"qty":2}
+```
+
+- Lists of different lengths panic (PHP throws).
 
 ## usort
 

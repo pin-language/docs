@@ -9,6 +9,7 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`rawurlencode`](#rawurlencode) | Percent-encode everything but `A-Z a-z 0-9 - _ . ~`, for a value inside a URL path or query. |
 | [`strlen`](#strlen) | Length of a string in bytes. |
 | [`substr`](#substr) | Part of a string, by byte offsets. |
+| [`mb_str_split`](#mb_str_split) | Split into pieces of `$length` characters (code points). |
 | [`mb_strlen`](#mb_strlen) | Length in characters (Unicode code points). |
 | [`mb_substr`](#mb_substr) | Part of a string, counted in characters (code points). |
 | [`mb_strpos`](#mb_strpos) | Position of the first match in characters, or -1. |
@@ -155,6 +156,26 @@ world|llo|ell|ell||
 - Out-of-range offsets give a shorter or empty string.
 - Offsets are bytes. One that falls inside a character (each Thai character is 3 bytes) **panics** instead of giving broken text; positions from `strpos()` never do. To count characters use `mb_substr()`, to shorten text for display `grapheme_substr()`.
 - **PHP:** The same, except that cutting a character in half panics instead of giving invalid UTF-8.
+
+## mb_str_split
+
+```php
+mb_str_split(string $s, int $length = 1): list<string>
+```
+
+Split into pieces of `$length` characters (code points).
+
+```php
+echo json_encode(mb_str_split("ไทย")), json_encode(mb_str_split("abcde", 2)), "\n";
+```
+
+Output:
+
+```
+["ไ","ท","ย"]["ab","cd","e"]
+```
+
+- PHP's `str_split()` splits bytes and breaks Thai text; this is the one to use.
 
 ## mb_strlen
 
