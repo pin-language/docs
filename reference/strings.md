@@ -27,6 +27,8 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`strtolower`](#strtolower) | Lower-case copy; only A–Z change. |
 | [`strtoupper`](#strtoupper) | Upper-case copy; only a–z change. |
 | [`trim`](#trim) | Copy without leading and trailing whitespace. |
+| [`sprintf`](#sprintf) | Format values into a string, like C and PHP. |
+| [`printf`](#printf) | Print what `sprintf` would give; returns its length in bytes. |
 | [`str_replace`](#str_replace) | Replace every `$search` in `$subject`. |
 | [`ltrim`](#ltrim) | Copy without leading whitespace (as `trim()`). |
 | [`rtrim`](#rtrim) | Copy without trailing whitespace (as `trim()`). |
@@ -519,6 +521,49 @@ Output:
 ```
 
 - Removes spaces, tabs, `\n`, `\r` and `\v`. There is no second argument yet.
+
+## sprintf
+
+```php
+sprintf(string $format, ...$values): string
+```
+
+Format values into a string, like C and PHP.
+
+```php
+echo sprintf("%s: %5.2f baht, %03d items, %x", "tea", 45.5, 7, 255), "\n";
+echo sprintf("[%-6s] [%6s] %+d %.1e %%", "ab", "ab", 3, 1234.5), "\n";
+```
+
+Output:
+
+```
+tea: 45.50 baht, 007 items, ff
+[ab    ] [    ab] +3 1.2e+3 %
+```
+
+- `%s` (any value), `%d` `%u` `%x` `%X` `%o` `%b` `%c` (int; `%c` is the character with that code point), `%f` `%F` `%e` (number), `%%`; flags `-` `+` `0` space, a width and `.precision`.
+- The format must be a string literal: the compiler checks each value's type against it and the count.
+- Widths count bytes as in PHP, but `%.2s` never cuts a character in half.
+- **PHP:** `sprintf()` without `%1$s` positions or `*` widths.
+
+## printf
+
+```php
+printf(string $format, ...$values): int
+```
+
+Print what `sprintf` would give; returns its length in bytes.
+
+```php
+printf("%-5s|%5.1f|\n", "tea", 2.25);
+```
+
+Output:
+
+```
+tea  |  2.2|
+```
 
 ## str_replace
 

@@ -4,6 +4,7 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 
 | | |
 |---|---|
+| [`date`](#date) | A time as text, with PHP's format letters, in UTC. |
 | [`intdiv`](#intdiv) | Integer division, rounding toward zero. |
 | [`round`](#round) | Round half away from zero, like PHP. |
 | [`floor`](#floor) | The largest whole number not above `$x`. |
@@ -18,6 +19,28 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`time`](#time) | The current time as seconds since 1970-01-01 00:00 UTC (Unix time). |
 | [`PHP_INT_MAX`](#php_int_max) | The largest int, 9223372036854775807. |
 | [`PHP_INT_MIN`](#php_int_min) | The smallest int, -9223372036854775808. |
+
+## date
+
+```php
+date(string $format, int $timestamp = time()): string
+```
+
+A time as text, with PHP's format letters, in UTC.
+
+```php
+echo date("Y-m-d H:i:s", 0), " ", date("D, jS F Y", 1762646400), " ", date("c", 1762646400), "\n";
+```
+
+Output:
+
+```
+1970-01-01 00:00:00 Sun, 9th November 2025 2025-11-09T00:00:00+00:00
+```
+
+- Letters: `d D j l N S w z F m M n t L Y y a A g G h H i s v u e T P p O Z U c r`; `\` before a letter keeps it as it is. Anything else is copied.
+- Always UTC: Pin has no time zones yet (`T` is `UTC`, `P` is `+00:00`). For an API, `date("c")` (ISO 8601) or plain `time()` numbers are the usual choice.
+- **PHP:** Like `date()` with `date.timezone=UTC`.
 
 ## intdiv
 
