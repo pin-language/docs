@@ -191,8 +191,7 @@ echo json_encode($o), "\n";               // {"id":1,"items":[{"name":"tea","pri
 - No inheritance, interfaces or static members. A class cannot hold itself directly (use `?Node`,
   `list<Node>` or an id). `==` does not compare objects: compare properties.
 - **null**: only a `?T` type can be null: `?int`, `?float`, `?bool`, `?string`, `?list<T>`, `?map<K,V>`,
-  `?ClassName`, and items: `list<?int>`, `map<string,?string>` (`go` tasks cannot take or give
-  `?int`/`?float`/`?bool` themselves; a list of them is fine).
+  `?ClassName`, and items: `list<?int>`, `map<string,?string>`; all of them through `go` tasks too.
   `return 5;` from a `?int` function and `?float $f = 3;` just work. A new variable needs its type to start null:
   `?User $u = null;`. `?T` properties start as null, so `__construct` need not set them.
 - Before using a `?T` **variable**, check it: inside `if ($u !== null) { ... }`, after

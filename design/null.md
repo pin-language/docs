@@ -167,8 +167,11 @@ What steps 1–4 do, and where they differ from the rules above.
   property or method (gives `?int`), `?:` with `null` or a `?int` on one side, `&` parameters, parameter and
   property defaults, `isset()`, `json_encode` (`null`), `json_decode` (null or missing gives null; a wrong type
   is still a 400). `5` where a `?int` goes and `3` where a `?float` goes just work.
-- **Not built:** `go` tasks cannot take or give `?int` / `?float` / `?bool` (a task frame keeps every value in
-  8 bytes; compile error). `strval()` / `intval()` of a `?int` is an error that says to check or use `??`.
+- **`go` tasks** (built later the same day): a `?int` / `?float` argument takes a 16-byte slot in the task's
+  frame; a `?int` / `?float` / `?bool` result keeps its value at byte 0 and its flag at byte 16, because byte 8
+  is the error pointer the runtime and the task's free function read. `await`, `await_all` and
+  `await_timeout` read it back (`tests/null_tasks.pn`). `strval()` / `intval()` of a `?int` is an error that
+  says to check or use `??`.
 - Tests: `tests/null_scalars.pn`, `null_scalar_class.pn`, `null_scalar_flow.pn`; compile errors
   `tests/errors/null_scalar.pn`, `null_scalar_go.pn`, `null_scalar_strval.pn`. ASAN + UBSAN clean on macOS.
 
