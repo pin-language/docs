@@ -67,24 +67,27 @@ TEA | CAKE | COFFEE
 
 ## Thai text and bytes
 
-Pin strings are bytes, like PHP. Thai characters take 3 bytes each in UTF-8, so `strlen` and `substr`
-count bytes, not letters:
+Pin strings are always valid UTF-8. Thai characters take 3 bytes each, so `strlen` and `substr` count bytes,
+like PHP; the `mb_*` functions count characters (code points), and the `grapheme_*` functions count what a
+reader sees — a Thai letter with its vowel and tone mark is one:
 
 ```php
-$word = "ไทย";
-echo strlen($word), "\n";
-echo substr($word, 0, 3), "\n";      // the first character: 3 bytes
+$word = "ที่นี่";
+echo strlen($word), " ", mb_strlen($word), " ", grapheme_strlen($word), "\n";
+echo substr($word, 0, 3), " ", mb_substr($word, 0, 2), " ", grapheme_substr($word, 0, 1), "\n";
 ```
 
 Output:
 
 ```text
-9
-ไ
+18 6 2
+ท ที ที่
 ```
 
-Cutting in the middle of a character gives broken text, so cut at byte offsets you got from `strpos` or
-from known ASCII text. Character-aware functions (`mb_strlen`, `grapheme_*`) are planned.
+To shorten text for display use `grapheme_substr()`: `mb_substr()` can leave a tone mark behind. A `substr()`
+whose offset falls inside a character panics instead of returning broken text, so cut at offsets you got from
+`strpos` or from known ASCII text. For names and emails people type, `normalizer_normalize($s,
+Normalizer::FORM_KC)` makes look-alike spellings equal before you store or compare them.
 
 ## Numbers inside text
 

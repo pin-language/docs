@@ -59,7 +59,7 @@ $parts = str_split("abc");
 Error:
 
 ```text
-example.pn:1: error: unknown function str_split(): no str_split() yet: use substr($s, $i, 1) in a loop
+example.pn:1: error: unknown function str_split(): no str_split() yet: use mb_substr($s, $i, 1) in a loop (grapheme_substr for what a reader sees)
 ```
 
 ## Errors you expect: throws, try, catch
