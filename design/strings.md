@@ -1,9 +1,9 @@
 # Pin — Strings and Thai text
 
-**Status (2026-11-09):** ST1, ST3 and ST4 are **built** on `next` (see "As built" at the end): strings are always
-valid UTF-8, `substr()` panics rather than cut a character, `mb_strlen` / `mb_substr` / `mb_strpos` / `mb_chr` /
-`mb_ord` and `grapheme_strlen` / `grapheme_substr`. Not built: ST2 (`bytes`), ST5's `mb_strtolower` /
-`mb_strtoupper`, ST6 (normalisation), the SIMD validator and the ASCII flag of ST4.
+**Status (2026-11-09):** ST1, ST3, ST4, ST5 and ST6 are **built** on `next` (see "As built" at the end): strings
+are always valid UTF-8, `substr()` panics rather than cut a character, `mb_strlen` / `mb_substr` / `mb_strpos` /
+`mb_chr` / `mb_ord`, `grapheme_strlen` / `grapheme_substr`, `mb_strtolower` / `mb_strtoupper`,
+`normalizer_normalize()`. Not built: ST2 (`bytes`), the SIMD validator and the ASCII flag of ST4; ST7 stays out.
 
 Decision rule: memory safety > speed > clarity > looking like PHP.
 
@@ -100,5 +100,18 @@ text.pn:4: panic: substr() would cut a character in half at byte 4 of "ไทย
   download, no ICU. `tools/check_unicode.py` compares Pin with Python's `unicodedata.iter_graphemes()` on random
   strings of every property: 100,000 strings, 0 differences. `mb_chr()` of a non-character panics (PHP returns
   `false`); `mb_ord("")` panics (PHP throws).
-- Tests: `tests/strings_utf8.pn`, `tests/panics/chr_high.pn`, `substr_cut.pn`, and the server checks in
-  `tests/run_tests.py` (body, path → 400; a bad header byte → U+FFFD).
+- **ST5:** `mb_strtolower` / `mb_strtoupper` use Unicode's full mappings (`ß` → `SS`) and the final-sigma rule
+  (Σ → ς at the end of a word, as PHP 8.3 does). Case_Ignorable and Cased, which that rule needs, are read back
+  from Python's own `str.lower()` by the generator, so the two agree exactly.
+- **ST6:** `normalizer_normalize($s, $form = Normalizer::FORM_C)` with `FORM_C`, `FORM_D`, `FORM_KC`, `FORM_KD`
+  (PHP's numbers 16, 4, 32, 8; the compiler knows the `Normalizer::` names): full decomposition from the
+  table, canonical ordering, then UAX #15's composition with blocked marks; Hangul by arithmetic; ASCII returned
+  as it is at once. Composition pairs are derived (a canonical pair that NFC composes back), so the exclusion
+  list needs no separate file. A form that is not one of the four panics.
+- **Checked:** `tools/check_unicode.py` runs every code point alone (1,112,053) and 200,000 random strings
+  through all six (lower, upper, NFC, NFD, NFKC, NFKD) and compares with Python: 0 differences.
+- **Size:** the tables are ~150 KB in a binary. Pin now links with `-ffunction-sections -fdata-sections` and
+  dead stripping, so a program that does not call these functions does not carry them (hello: 148 KB before
+  this work, 54 KB now). Benchmark times unchanged.
+- Tests: `tests/strings_utf8.pn`, `tests/strings_case_norm.pn`, `tests/panics/chr_high.pn`, `substr_cut.pn`, and
+  the server checks in `tests/run_tests.py` (body, path → 400; a bad header byte → U+FFFD).

@@ -16,6 +16,9 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`mb_ord`](#mb_ord) | The Unicode code point of the first character. |
 | [`grapheme_strlen`](#grapheme_strlen) | Length in what people see as characters (grapheme clusters). |
 | [`grapheme_substr`](#grapheme_substr) | Part of a string, counted in what people see as characters. **Use this to shorten text for display.** |
+| [`mb_strtolower`](#mb_strtolower) | Lower-case copy for every script that has letter case. |
+| [`mb_strtoupper`](#mb_strtoupper) | Upper-case copy for every script that has letter case. |
+| [`normalizer_normalize`](#normalizer_normalize) | The same text in one Unicode normal form, so that equal-looking strings compare equal. |
 | [`strpos`](#strpos) | Byte position of the first match, or -1. |
 | [`str_contains`](#str_contains) | Whether `$needle` occurs in `$haystack`. |
 | [`str_starts_with`](#str_starts_with) | Whether `$s` begins with `$prefix`. |
@@ -282,6 +285,76 @@ Output:
 - The same rules as `substr()` for negative and out-of-range values, in grapheme clusters.
 - Never separates a tone mark or vowel from its letter, or an emoji from its modifier.
 - **PHP:** `grapheme_substr()`; PHP returns `false` when `$start` is past the end, Pin returns `""`.
+
+## mb_strtolower
+
+```php
+mb_strtolower(string $s): string
+```
+
+Lower-case copy for every script that has letter case.
+
+```php
+echo mb_strtolower("ÄÖÜ ΟΔΥΣΣΕΥΣ Hello ไทย"), "\n";
+```
+
+Output:
+
+```
+äöü οδυσσευς hello ไทย
+```
+
+- Unicode's full mappings, and a Greek Σ at the end of a word becomes ς (as PHP 8.3 does).
+- Thai has no letter case: it is left as it is. `strtolower()` changes A–Z only.
+- **PHP:** `mb_strtolower()` with UTF-8.
+
+## mb_strtoupper
+
+```php
+mb_strtoupper(string $s): string
+```
+
+Upper-case copy for every script that has letter case.
+
+```php
+echo mb_strtoupper("straße éa ไทย"), "\n";
+```
+
+Output:
+
+```
+STRASSE ÉA ไทย
+```
+
+- Full mappings: `ß` becomes `SS`, so the result can be longer.
+- **PHP:** `mb_strtoupper()` with UTF-8.
+
+## normalizer_normalize
+
+```php
+normalizer_normalize(string $s, int $form = Normalizer::FORM_C): string
+```
+
+The same text in one Unicode normal form, so that equal-looking strings compare equal.
+
+```php
+$a = "café";                                  // é as one code point
+$b = "cafe" . mb_chr(769);                     // e + a combining accent
+echo $a == $b ? "same" : "different", " ", normalizer_normalize($a) == normalizer_normalize($b) ? "same" : "different", "\n";
+echo normalizer_normalize("ﬁle ①", Normalizer::FORM_KC), "\n";
+```
+
+Output:
+
+```
+different same
+file 1
+```
+
+- `Normalizer::FORM_C` (the default), `FORM_D`, `FORM_KC`, `FORM_KD` (also `Normalizer::NFC` ...).
+- **Usernames, emails and lookup keys: `FORM_KC` before storing and before comparing**: it also folds look-alikes such as `ﬁ` → `fi`, and the two spellings of Thai `ำ`.
+- ASCII text comes back unchanged at once.
+- **PHP:** `normalizer_normalize()` (PHP's intl extension); Pin returns the string, never `false`.
 
 ## strpos
 
