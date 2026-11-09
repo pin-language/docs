@@ -76,7 +76,7 @@ Ben: 80
 | Composer packages | `pin get github.com/owner/repo@v1` + `pin.lock` |
 | classes | the same, without `extends` / `interface` / `static` |
 | `null` | only in `?T` types (`?User`, `?int`), checked before use |
-| closures | not yet |
+| closures | `fn($x) => ...` and `function () use ($a) { }` where they are used (`array_map`, `usort`, an `fn(T): R` parameter); not returned or stored yet |
 | int overflow → float | wraps around (64-bit) |
 | PHP-FPM + nginx | `serve(8080, "handle")` — one native binary |
 

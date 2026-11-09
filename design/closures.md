@@ -1,7 +1,8 @@
 # Pin — Closures
 
-**Status (2026-11-09):** **designed, not built.** Open questions for the owner are at the end. Until this is
-built, `usort($xs, "by_price")`, `array_map("label", $xs)` and `array_filter($xs, "keep")` take function names.
+**Status (2026-11-09):** steps 1–2 **built** (the owner took the proposed answers to Q1–Q3): `fn` types, named
+functions as values, local closures. Steps 3 (`use (&$x)`) and 4 (escaping closures) are compile errors that say
+so. See "As built" at the end.
 
 Decision rule: memory safety > speed > clarity > looking like PHP.
 
@@ -128,3 +129,26 @@ real need.
 - **Q2** Leaving out parameter types where the expected type is known (C3). Proposed: yes — it is what makes
   `array_map(fn($i) => $i->price, $items)` read like PHP, and the types are still checked.
 - **Q3** Order: build steps 1–2 now (the callbacks people write every day) and 3–4 later. Proposed: yes.
+
+## As built (steps 1–2, 2026-11-09)
+
+- **Representation:** an `fn` value is `{ code, env }` in two registers. `code` is a trampoline `(ptr env, args...)`;
+  for `name(...)` it is a wrapper and `env` is null. A closure's body is compiled as a function of its captures
+  followed by its parameters (captures arrive as read-only loans, like every parameter), and `env` is a block in
+  the enclosing function's stack frame holding the captured values. Nothing is allocated.
+- **Captures:** `fn` captures every variable of the enclosing function its body names (and `$this` in a method);
+  `function () use ($a)` only those listed. A scalar `use ($n)` changed inside the closure changes its own copy, as
+  in PHP; lists, maps, objects and strings are loans and cannot be changed.
+- **C3:** parameter types come from the expected `fn` type; the result type from the expected type, a declared
+  `: T`, or (for `fn`) the body's expression. `array_map`'s result type is the closure's result.
+- **C4:** a closure written as an argument lends its captures for that call only. A closure assigned to a variable
+  keeps what it reads (and what those borrow from: a foreach list, `$u = $users[0]`'s list) read-only for the rest
+  of the function — "last use" is not tracked yet, so this is stricter than C4 (safe, never unsafe).
+- **Escapes refused (step 4):** returning an `fn`, `fn` properties, lists and maps of `fn`, `go` with an `fn`
+  argument, a closure returning a closure. `json_encode`, `copy`, `==` and `echo` of an `fn` are errors.
+- **Built-ins:** `array_map`, `array_filter`, `usort` (through a context adapter around the runtime's stable merge
+  sort) and the new `array_reduce` take closures, fn values and names. Measured (20M ints, M2):
+  `array_map(fn($x) => $x * 2 + $k, $xs)` 0.09 s, `array_map("dbl", $xs)` 0.10 s, a hand-written foreach 0.06 s
+  — LLVM inlines the trampoline, so a closure costs what a named function does.
+- **Unchanged code:** the IR of the 75 existing programs is the same apart from new `declare` lines.
+- Tests: `tests/closures.pn`, `closures_more.pn`; errors `tests/errors/closure_*.pn` (6).

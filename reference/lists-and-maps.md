@@ -16,6 +16,7 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`array_count_values`](#array_count_values) | How many times each value occurs, in first-seen order. |
 | [`array_flip`](#array_flip) | Values become keys and keys values (values must be int or string). |
 | [`array_combine`](#array_combine) | A map from a list of keys and a list of values. |
+| [`array_reduce`](#array_reduce) | Fold a list into one value. |
 | [`usort`](#usort) | Sort a list in place with your own comparison function. |
 | [`array_pop`](#array_pop) | Take the last item out of the list, or null when it is empty. |
 | [`array_shift`](#array_shift) | Take the first item out of the list, or null when it is empty. |
@@ -40,37 +41,39 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 ## array_map
 
 ```php
-array_map(string $function, list<T> $xs): list<R>
+array_map(fn(T): R $f, list<T> $xs): list<R>
 ```
 
 A new list: the function applied to each item.
 
 ```php
-function label(int $satang): string { return number_format($satang / 100, 2); }
-echo json_encode(array_map("label", [4500, 12000])), "\n";
+echo json_encode(array_map(fn($satang) => number_format($satang / 100, 2), [4500, 12000])), "\n";
+function label(int $satang): string { return "฿" . number_format($satang / 100, 2); }
+echo json_encode(array_map(label(...), [4500])), json_encode(array_map("strtoupper", ["tea"])), "\n";
 ```
 
 Output:
 
 ```
 ["45.00","120.00"]
+["฿45.00"]["TEA"]
 ```
 
-- `$function` is the name of a function in the same file taking one `T` and giving any `R`; it cannot be `throws`. The compiler writes the loop: no callback at run time.
+- `$f` is a closure (`fn($x) => ...`, whose parameter type comes from the list), a function value (`label(...)`), or a function's name as a string; it cannot be `throws`.
 - One-argument built-ins work by name too: `array_map("strtoupper", $names)`, `array_map("intval", $parts)`, `array_filter($xs, "ctype_digit")`.
-- **PHP:** `array_map('label', $xs)` with a function name (Pin has no closures yet); one list.
+- **PHP:** Like PHP with one list; the closure reads the variables around it (no `use` needed for `fn`).
 
 ## array_filter
 
 ```php
-array_filter(list<T> $xs, string $keep): list<T>
+array_filter(list<T> $xs, fn(T): bool $keep): list<T>
 ```
 
 A new list of the items the function keeps.
 
 ```php
-function cheap(int $price): bool { return $price < 100; }
-echo json_encode(array_filter([45, 120, 30], "cheap")), "\n";
+$limit = 100;
+echo json_encode(array_filter([45, 120, 30], fn($price) => $price < $limit)), "\n";
 ```
 
 Output:
@@ -79,7 +82,7 @@ Output:
 [45,30]
 ```
 
-- `$keep` names a function of the same file `(T $x): bool`. The kept items are copied, and the new list is renumbered from 0 (PHP keeps the old keys).
+- `$keep` is a closure, a function value or a function name `(T $x): bool`. The kept items are copied, and the new list is renumbered from 0 (PHP keeps the old keys).
 - **PHP:** PHP keeps the original keys; Pin's result is a list numbered from 0.
 
 ## array_key_first
@@ -283,10 +286,30 @@ Output:
 
 - Lists of different lengths panic (PHP throws).
 
+## array_reduce
+
+```php
+array_reduce(list<T> $xs, fn(C, T): C $f, C $initial): C
+```
+
+Fold a list into one value.
+
+```php
+echo array_reduce([45, 120, 30], fn($sum, $p) => $sum + $p, 0), " ", array_reduce(["a", "b"], fn($s, $x) => $s . $x . ";", ""), "\n";
+```
+
+Output:
+
+```
+195 a;b;
+```
+
+- The carry's type is the type of `$initial`; the function gets the carry and an item and gives the next carry.
+
 ## usort
 
 ```php
-usort(list<T> $xs, string $compare): void
+usort(list<T> $xs, fn(T, T): int $compare): void
 ```
 
 Sort a list in place with your own comparison function.
@@ -297,18 +320,20 @@ function by_price(Item $a, Item $b): int { return $a->price - $b->price; }
 list<Item> $items = [new Item("cake", 120), new Item("tea", 45), new Item("rice", 30)];
 usort($items, "by_price");
 foreach ($items as $i) { echo $i->name, " "; }
+usort($items, fn($a, $b) => $b->price <=> $a->price);
+echo "| most expensive: ", $items[0]->name;
 echo "\n";
 ```
 
 Output:
 
 ```
-rice tea cake 
+rice tea cake | most expensive: cake
 ```
 
-- `$compare` is the name of a function in the same file, `(T $a, T $b): int`: negative puts `$a` first, positive `$b`, 0 keeps their order (the sort is stable). It cannot be `throws`.
+- `$compare` is a closure `fn($a, $b) => $a->x <=> $b->x`, a function value, or a function's name, `(T $a, T $b): int`: negative puts `$a` first, positive `$b`, 0 keeps their order (the sort is stable). It cannot be `throws`.
 - Lists of int, float, string, objects, lists or maps. A list of bools: `sort()`.
-- **PHP:** `usort($xs, 'by_price')` with a function name; Pin has no closures yet.
+- **PHP:** Same as PHP 8 (stable).
 
 ## array_pop
 

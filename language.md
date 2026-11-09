@@ -341,6 +341,5 @@ http://127.0.0.1:9001 {                 # outgoing: Pin calls http://127.0.0.1:9
 
 ## Not in Pin yet
 
-Inheritance and interfaces, `null` and `?Type`, `finally`,
-closures, sorting with a custom comparison, databases other than SQLite (PostgreSQL is next), WebSocket. Designs for most of these are in
+Inheritance and interfaces, `finally`, closures that are returned or stored (local closures exist), WebSocket. Designs for most of these are in
 [`design/`](design/).
