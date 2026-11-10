@@ -1,8 +1,8 @@
 # Pin — Closures
 
-**Status (2026-11-09):** steps 1–2 **built** (the owner took the proposed answers to Q1–Q3): `fn` types, named
-functions as values, local closures. Steps 3 (`use (&$x)`) and 4 (escaping closures) are compile errors that say
-so. See "As built" at the end.
+**Status (2026-11-10):** all four steps **built** (the owner took the proposed answers to Q1–Q3): `fn` types,
+named functions as values, local closures (2026-11-09), `use (&$x)` and escaping closures (2026-11-10). See "As
+built" at the end.
 
 Decision rule: memory safety > speed > clarity > looking like PHP.
 
@@ -144,7 +144,7 @@ real need.
 - **C4:** a closure written as an argument lends its captures for that call only. A closure assigned to a variable
   keeps what it reads (and what those borrow from: a foreach list, `$u = $users[0]`'s list) read-only for the rest
   of the function — "last use" is not tracked yet, so this is stricter than C4 (safe, never unsafe).
-- **Escapes refused (step 4):** returning an `fn`, `fn` properties, lists and maps of `fn`, `go` with an `fn`
+- **Escapes refused (step 4, built since: see below):** returning an `fn`, `fn` properties, lists and maps of `fn`, `go` with an `fn`
   argument, a closure returning a closure. `json_encode`, `copy`, `==` and `echo` of an `fn` are errors.
 - **Built-ins:** `array_map`, `array_filter`, `usort` (through a context adapter around the runtime's stable merge
   sort) and the new `array_reduce` take closures, fn values and names. Measured (20M ints, M2):
@@ -152,3 +152,47 @@ real need.
   — LLVM inlines the trampoline, so a closure costs what a named function does.
 - **Unchanged code:** the IR of the 75 existing programs is the same apart from new `declare` lines.
 - Tests: `tests/closures.pn`, `closures_more.pn`; errors `tests/errors/closure_*.pn` (6).
+
+## As built (steps 3–4, 2026-11-10)
+
+- **Representation (changed from steps 1–2):** an `fn` value is one pointer to a block `{ code, free, copy,
+  captured values... }` (runtime `FnBlock`), so it fits a list item, a map slot or a property like any other heap
+  value. A named function's block is a constant; a local closure's is in its maker's stack frame (`free` is null:
+  nothing to free); an escaping closure's is allocated once, when it is made, and owns what it captured. Calls load
+  `code` (marked `!invariant.load`, so LLVM hoists it out of loops) and pass the block as the context. Measured
+  (20M ints, M2, best of 5): `array_map(fn($x) => $x * 2 + $k, $xs)` 0.10 s, a closure through an `fn` parameter
+  0.03 s, `usort` with a closure on 3M ints 0.10 s — the same as the two-register form of steps 1–2. The IR of the
+  75 programs without closures is unchanged (one metadata line added).
+- **C5, `use (&$x)`:** the block holds the address of `$x`; inside the closure `$x` is an `&` parameter. Each call
+  of the closure — and each call that is given it, or a variable holding it — is checked as a change of `$x` at
+  that point, with the existing rules: not inside a `foreach` over `$x`, not while a loan from `$x` is used later,
+  not while a task reads it, and nothing else in the same expression may read `$x` or a loan from it. A statement
+  cannot store the closure's result into `$x` (`$xs[] = $add()`, `$s .= $f()`). `$x` cannot be moved while the
+  closure can still be called. A closure that also reads `$x` (or a loan from it), directly or through another
+  closure it calls, is refused. Only local closures may have `use (&...)`; it must be passed to a call or kept in a
+  variable. `copy()` of one is a compile error where the compiler can see it and a panic otherwise (an `fn`
+  parameter copied by the callee). Scalars captured with `use (&$n)` keep PHP's meaning exactly.
+- **C6:** a closure is escaping when it is returned, assigned to a property, a list or map item, written in a list
+  or map literal, or given to `go` — directly, through `?:` / `??`, or through variables assigned to one of those
+  (found before the function is compiled). Escaping closures copy ints, floats, bools and strings and move lists,
+  maps, objects and closures out of their variables; `$this`, `use (&...)` and borrowed lists (parameters, foreach
+  variables) are errors that say what to do (`$rate = $this->rate`, `copy()`). Its `free` frees the captured
+  values and the block; its `copy` copies them deeply (as `copy()`). A local closure kept in a variable cannot be
+  assigned to another variable or stored (`copy($f)` makes an owned one).
+- **C4 in loops:** a closure kept in a variable inside a loop, reading a string, object, list or closure that is
+  replaced earlier in the loop body, is refused unless every round makes the variable again after the change and
+  before any use of it — otherwise the closure from one round would read what the next round freed. Numbers and
+  bools are copied into the block, so they are not affected. A closure written into a list or map item through
+  `foreach (... as &$f)` is escaping (it is stored).
+- **Review:** a separate agent (2026-11-10) tried to break these rules with 55 programs under ASAN and `leaks`;
+  it found the two holes above (the loop case and `foreach ... &$f`), both fixed and kept as tests. No leaks.
+- **C7:** `go f(fn ...)` works; a closure written there is escaping (owned by the task), a variable holding one is
+  lent to the task until `await` like any other argument.
+- **Also:** `fn` properties (set in `__construct`; no default; `json_encode` refuses a public one), `list<fn>`,
+  `map<K, fn>`, calling a call's result (`adder(1)(2)`, `$fs[0](3)`, `(fn($x) => $x)(1)`), and a closure call as a
+  statement (`$f($x);` for a void closure, which steps 1–2 refused by mistake), and `?fn` values (from
+  `array_pop`) called after a null check or with `??`.
+- Tests: `tests/closures_ref.pn`, `closures_escape.pn`, `closures_owned.pn`, `closures_loops.pn`, `tests/panics/closure_ref_copy.pn`,
+  errors `tests/errors/closure_*.pn` (16). Leaks: checked with LeakSanitizer in CI (Linux) and `leaks` on macOS
+  (only the main task's stack, as for hello world).
+

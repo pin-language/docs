@@ -309,10 +309,29 @@ function sum_by(list<Line> $lines, fn(Line): int $f): int {           // a param
 
 - Parameter types come from where the closure goes (`array_map`, `usort`, an `fn(Line): int` parameter);
   elsewhere write them: `$small = fn(int $x): bool => $x < $limit;`. A named function is a value too: `label(...)`.
-- A closure reads the variables around it; it cannot change them (`use (&$x)` is not built yet: return the value).
-  While a closure kept in a variable can still be called, what it reads cannot change (the error says so).
-- A closure cannot be returned, stored in a property, list or map, or given to `go` yet (step 4 of
-  design/closures.md): pass it as a parameter instead.
+- A closure reads the variables around it as loans: nothing is copied. While a closure kept in a variable can still
+  be called, what it reads cannot change (the error says so).
+- `function () use (&$count) { $count++; }` changes `$count` (only in a closure passed to a call or kept in a
+  variable). Each call of it counts as a change of `$count`: not inside a `foreach` over it, not in the same
+  expression as another use of it.
+- A closure that is **returned, stored** in a property, list or map, or **given to `go`** owns what it uses:
+  ints, strings and bools are copied into it, lists, maps and objects are **moved** (use `copy($xs)` to keep yours).
+  It cannot use `$this` or `use (&...)` — read what it needs into a variable first.
+- In a loop, make a kept closure again after what it reads changes (or write it at the call); the compiler refuses
+  a closure from the previous round that would read a replaced string, object or list.
+- An `fn` parameter is a loan: to keep it, store `copy($f)`. `($this->onClick)($x)` calls a property.
+
+```php
+function discounter(int $percent): fn(int): int {
+    return fn(int $p): int => intdiv($p * (100 - $percent), 100);
+}
+class Router {
+    public map<string, fn(string): string> $routes = [];
+    public function get(string $path, fn(string): string $h): void { $this->routes[$path] = copy($h); }
+}
+$tenOff = discounter(10);
+echo $tenOff(4500);                                  // 4050
+```
 
 A map by value: `arsort($counts);` (largest first, keys kept), then `array_slice(array_keys($counts), 0, 3)`.
 
@@ -527,7 +546,7 @@ initialize, ids, notifications and errors; its README has a complete server.
 | `global`, `static`, `const`, `define` | parameters / local variables |
 | `strpos(...) === false` | `strpos(...) < 0` |
 | `explode`, `implode`, `sort`, `rsort` | the same (`sort($xs)` needs a list variable you own) |
-| `array_walk`, returning a closure… | write the loop; the error message names the replacement (`in_array`, `max`/`min`, `str_replace`, `round`, `array_keys`, `htmlspecialchars`, `base64_*`, `number_format`, `sprintf`, `date`, and `usort` / `array_map` / `array_filter` / `array_reduce` with closures, `ksort`/`asort`, `range`, `**`, math functions, `filter_var` (null when invalid), `ctype_*` exist) |
+| `array_walk`… | write the loop; the error message names the replacement (`in_array`, `max`/`min`, `str_replace`, `round`, `array_keys`, `htmlspecialchars`, `base64_*`, `number_format`, `sprintf`, `date`, and `usort` / `array_map` / `array_filter` / `array_reduce` with closures, `ksort`/`asort`, `range`, `**`, math functions, `filter_var` (null when invalid), `ctype_*` exist) |
 | `$_SERVER["HTTP_AUTHORIZATION"]`, `getallheaders()` | `request_header("Authorization")` |
 | `header("Location: /x")`, `setcookie(...)` | `response_header("Location", "/x")`, `response_header("Set-Cookie", "...")` |
 | `$_GET["x"]`, `$_POST["x"]` | `query_param($path, "x")`, `form_param($body, "x")` |
