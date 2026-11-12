@@ -70,11 +70,13 @@ Ben: 80
 | `$_GET['x']`, `$_POST['x']` | `query_param($path, "x")`, `form_param($body, "x")` |
 | `json_decode($body, true)['x']` | `json_string($body, "x")`, `json_int`, `json_float`, `json_bool`, `json_has` |
 | `switch` / `match` | `if / elseif / else` |
-| `try` / `catch` | check first; panics are for bugs |
-| `PDO` | `db_open`, `db_exec`, `db_query`, `db_json` (SQLite; [chapter 11](11-database.md)) |
+| `try` / `catch` | `function f(): T throws`, then `try f()` or `try f() catch ($e) { ... }`; panics are for bugs |
+| `PDO` | `db_open`, `db_exec`, `db_query`, `db_json` (SQLite and PostgreSQL; [chapter 11](11-database.md)) |
 | `include`, `use`, namespaces | `import name;` and `name::fn()` ([chapter 12](12-modules-and-packages.md)) |
 | Composer packages | `pin get github.com/owner/repo@v1` + `pin.lock` |
-| classes, closures, `null` | not yet |
+| classes | the same, without `extends` / `interface` / `static` |
+| `null` | only in `?T` types (`?User`, `?int`), checked before use |
+| closures | `fn($x) => ...` and `function () use ($a, &$b) { }`; local ones borrow what they use, returned / stored / `go` ones own it (copied or moved); `fn(T): R` types for parameters, results, properties, lists and maps |
 | int overflow → float | wraps around (64-bit) |
 | PHP-FPM + nginx | `serve(8080, "handle")` — one native binary |
 

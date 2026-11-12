@@ -38,8 +38,9 @@ so fix and re-check. Exit code 0 = ok, 1 = compile error or run-time panic, 2 = 
 1. **Types.** `int float bool string list<T> map<K,V> void`, plus your classes. `K` ∈ int/string; `T` and `V`
    can be any type, nested: `list<Order>`, `list<list<int>>`, `map<string,list<string>>`, `map<int,User>`.
 2. **Every parameter and return type is written.** `function f(int $n, list<int> $xs): string`.
-3. **A variable keeps the type of its first value.** Empty containers need the type:
-   `list<int> $ids = [];` `map<string,int> $count = [];`
+3. **A variable keeps the type of its first value**, in the whole function (two `if` branches cannot use one name
+   for two types: give each its own name). Empty containers need the type: `list<int> $ids = [];`
+   `map<string,int> $count = [];`
 4. **Conditions are bool.** `if ($n != 0)`, `if (count($xs) > 0)`, `if (strlen($s) > 0)` — never `if ($n)`.
 5. **A variable must have a value on every path before use.** Initialise before `if` / loops.
 6. **Lists, maps and objects move on `=`.** After `$b = $a;` do not use `$a`. Want two? `$b = copy($a);`
@@ -188,9 +189,35 @@ echo json_encode($o), "\n";               // {"id":1,"items":[{"name":"tea","pri
 - `$u = $users[0];` (an object, list or map read from a list, map or property) **borrows** it read-only, no
   copy. While `$u` is still used later, `$users` cannot be changed. Need your own? `$u = copy($users[0]);`
 - Change items in place: `foreach ($users as &$u) { $u->visits += 1; }`
-- No inheritance, interfaces, static members, `null` or `?->` yet. A class cannot hold itself (use
+- No inheritance, interfaces or static members. A class cannot hold itself directly (use `?Node`,
   `list<Node>` or an id). `==` does not compare objects: compare properties.
-- Promote only `int float bool string` constructor parameters. For a list, map or object property, declare it
+- **null**: only a `?T` type can be null: `?int`, `?float`, `?bool`, `?string`, `?list<T>`, `?map<K,V>`,
+  `?ClassName`, and items: `list<?int>`, `map<string,?string>`; all of them through `go` tasks too.
+  `return 5;` from a `?int` function and `?float $f = 3;` just work. A new variable needs its type to start null:
+  `?User $u = null;`. `?T` properties start as null, so `__construct` need not set them.
+- Before using a `?T` **variable**, check it: inside `if ($u !== null) { ... }`, after
+  `if ($u === null) { return ...; }`, on the right of `$u !== null && ...`, and in `isset($u) ? ... : ...` it
+  counts as `T`. Assigning it again (or lending it with `&` to a `?T &` parameter) means checking again. A
+  **property** checks the same way (`if ($u->email !== null) { strlen($u->email); }`, also
+  `$u->addr !== null && $u->addr->zip !== null`) until `$u` is changed: assigning that property, a method that
+  changes `$u`, lending `$u` with `&`, or a loop that does any of these. A call result does not carry over: put
+  it in a variable.
+- `$u?->name` (null if `$u` is null; gives `?T`), `$x ?? "default"`, and
+  `$u = find($id) ?? throw error(404, "not found");` (a `User` from here on). `=== null` on a value that is
+  never null is a compile error. `json_encode` writes `null`; `json_decode` gives null for a `?T` field that is
+  `null` or missing. A null property is still written (`"email":null`); for an answer that leaves a key out,
+  use a second class without that property.
+- **Items that may be null:** `list<?int> $xs = [1, null, 3];` (`[1, null]` alone is already `list<?int>`),
+  `$xs[] = null;`, `fill(3, null)`. `$xs[$i]` is `?int`: put it in a variable and check it, or write
+  `$xs[$i] ?? 0` (the default also when the item is missing). `isset($m[$k])` is false for a null value, as in
+  PHP; `array_key_exists($k, $m)` is true. `sort()` / `implode()` need items that are never null.
+- **An optional JSON field:** make it a `?T` constructor parameter with `= null`:
+  `class NewUser { public function __construct(public string $name, public ?string $email = null) {} }`.
+  `json_decode` fills a class with a constructor **through the constructor's parameters only**: a `?T` property
+  that is not a parameter is an `unknown field` in the body. A property default (`public string $name = "";`)
+  does not make a field optional; only `?T` does.
+- Promote `int float bool string` and their `?` forms (`public ?int $score = null` is an optional JSON number).
+  For a list, map or object property, declare it
   (`public list<int> $scores = [];`) and set it with `$this->scores = copy($scores);` in `__construct`.
 - `&` also takes paths: `drop_lowest(&$students[1])`, `f(&$o->items)`.
 - `json_encode` writes public properties in declaration order (promoted ones sit where `__construct` is in the
@@ -227,10 +254,19 @@ function tally(list<int> $xs): map<int,int> {
     return $c;
 }
 
-// "not found" without null: return -1 / "" and check it
-function find(list<int> $xs, int $want): int {
-    foreach ($xs as $i => $x) { if ($x == $want) { return $i; } }
-    return -1;
+// "not found": return ?T and check it (also for numbers: ?int, then $n ?? 0)
+class Customer {
+    public string $name;
+    public ?string $email;                       // starts as null
+    public function __construct(string $name) { $this->name = $name; }
+}
+function find_customer(list<Customer> $all, string $name): ?Customer {
+    foreach ($all as $c) { if ($c->name == $name) { return copy($c); } }
+    return null;
+}
+function email_of(list<Customer> $all, string $name): string throws {
+    $c = find_customer($all, $name) ?? throw error(404, "no customer $name");
+    return $c->email ?? "(no email)";            // $c is a Customer here; the ?string needs ??
 }
 
 // mixed JSON object: a class, then json_encode()
@@ -255,36 +291,55 @@ function median(list<int> $xs): float {     // assumes count($xs) > 0
 }
 ```
 
-Money: keep integer satang/cents; format with `intdiv` and `%` (no `sprintf` / `number_format` yet).
+Money: keep integer satang/cents; format at the end: `number_format($satang / 100, 2)` gives `"1,234.50"`.
+
+Closures (`fn` and `function () use ()`) work where they are used, as in PHP; `<=>` gives -1 / 0 / 1:
 
 ```php
-function baht(int $satang): string {        // 123450 -> "1234.50", -5 -> "-0.05"
-    $sign = $satang < 0 ? "-" : "";
-    $abs = $satang < 0 ? -$satang : $satang;
-    $frac = $abs % 100;
-    return $sign . intdiv($abs, 100) . "." . ($frac < 10 ? "0" . $frac : strval($frac));
+class Line { public function __construct(public string $item, public int $total) {} }
+function top3(list<Line> $lines, int $min): list<Line> {
+    $big = array_filter($lines, fn($l) => $l->total >= $min);       // $min is read, not copied
+    usort($big, fn($a, $b) => $b->total <=> $a->total);              // stable: ties keep their order
+    return array_slice($big, 0, 3);
+}
+function sum_by(list<Line> $lines, fn(Line): int $f): int {           // a parameter of fn type
+    return array_reduce($lines, fn($s, $l) => $s + $f($l), 0);
 }
 ```
 
-Top N from a map by value (`sort` has no custom comparison yet): pick the best not yet used, N times.
+- Parameter types come from where the closure goes (`array_map`, `usort`, an `fn(Line): int` parameter);
+  elsewhere write them: `$small = fn(int $x): bool => $x < $limit;`. A named function is a value too: `label(...)`.
+- A closure reads the variables around it as loans: nothing is copied. While a closure kept in a variable can still
+  be called, what it reads cannot change (the error says so).
+- `function () use (&$count) { $count++; }` changes `$count` (only in a closure passed to a call or kept in a
+  variable). Each call of it counts as a change of `$count`: not inside a `foreach` over it, not in the same
+  expression as another use of it.
+- A closure that is **returned, stored** in a property, list or map, or **given to `go`** owns what it uses:
+  ints, strings and bools are copied into it, lists, maps and objects are **moved** (use `copy($xs)` to keep yours).
+  It cannot use `$this` or `use (&...)` — read what it needs into a variable first.
+- In a loop, make a kept closure again after what it reads changes (or write it at the call); the compiler refuses
+  a closure from the previous round that would read a replaced string, object or list.
+- An `fn` parameter is a loan: to keep it, store `copy($f)`. `($this->onClick)($x)` calls a property.
 
 ```php
-function top3(map<string,int> $counts): string {
-    map<string,bool> $used = [];
-    $out = "";
-    for ($round = 0; $round < 3; $round++) {
-        $best = "";
-        $bestN = -1;
-        foreach ($counts as $w => $n) {
-            if (!isset($used[$w]) && $n > $bestN) { $best = $w; $bestN = $n; }
-        }
-        if ($bestN < 0) { break; }
-        $used[$best] = true;
-        $out .= "$best: $bestN\n";
-    }
-    return $out;
+function discounter(int $percent): fn(int): int {
+    return fn(int $p): int => intdiv($p * (100 - $percent), 100);
 }
+class Router {
+    public map<string, fn(string): string> $routes = [];
+    public function get(string $path, fn(string): string $h): void { $this->routes[$path] = copy($h); }
+}
+$tenOff = discounter(10);
+echo $tenOff(4500);                                  // 4050
 ```
+
+A map by value: `arsort($counts);` (largest first, keys kept), then `array_slice(array_keys($counts), 0, 3)`.
+
+Checking client input: `filter_var($email, FILTER_VALIDATE_EMAIL)` is the string or null,
+`filter_var($s, FILTER_VALIDATE_INT)` an `?int` — test with `=== null`, not `!`.
+
+Text in columns: `sprintf("%-10s", $s)` and `str_pad` count **bytes** (as PHP); for Thai, cut with
+`grapheme_substr($s, 0, 10)` and pad with `str_repeat(" ", 10 - grapheme_strlen($cut))`.
 
 Strings in lists: `explode`, `implode`, `list<string>`.
 
@@ -308,6 +363,12 @@ function initials(list<string> $names): string {
 HTTP API — GET with a query string, POST with a JSON or form body:
 
 ```php
+class OrderIn {                                     // the shape of the POST body
+    public function __construct(public string $item, public int $qty) throws {
+        if ($item == "" || $qty < 1 || $qty > 20) { throw error(400, "item and qty 1-20"); }
+    }
+}
+
 function handle(string $method, string $path, string $body): string {   // exactly this signature (`throws` allowed)
     $route = url_path($path);                       // "/quote?item=cake" -> "/quote"
     if ($method == "GET" && $route == "/health") { return "{\"ok\":true}"; }
@@ -318,11 +379,12 @@ function handle(string $method, string $path, string $body): string {   // exact
         return "{\"item\":" . json_encode($item) . ",\"qty\":" . $qty . "}";
     }
     if ($method == "POST" && $route == "/orders") {
-        // body {"item":"cake","qty":2} — top-level keys only
-        if (!json_has($body, "item")) { http_status(400); return "{\"error\":\"item is required\"}"; }
-        $item = json_string($body, "item");         // "" if missing or not a string
-        $qty = json_int($body, "qty");              // 0 if missing or not an integer
-        return "{\"created\":" . json_encode($item) . ",\"qty\":" . $qty . "}";
+        // body {"item":"cake","qty":2}: json_decode checks every field and the constructor's rules
+        OrderIn $in = try json_decode($body) catch ($e) {
+            http_status(400);
+            return json_encode(["error" => $e->message]);   // e.g. "$.qty: want an integer, got a string"
+        };
+        return json_encode($in);                    // {"item":"cake","qty":2}
     }
     http_status(404);
     return "{\"error\":\"not found\"}";
@@ -344,7 +406,9 @@ Request helpers (all take strings and never fail on bad input):
 - **Standard input**: `$line = try read_line() catch ($e) { break; };` (note the `;` after `}`) (end of input fails with code 1; output
   is flushed before it waits). An MCP server over stdio: the `github.com/pin-language/mcp` package.
 
-Database (SQLite) — one connection per request, closed automatically:
+Database (SQLite) — open one connection per request; it goes back to a per-thread pool automatically (a task opens its own).
+The pool needs no setup (4 connections per thread); `db_pool("app.db", 8, 60000)` at the top level before `serve()`
+changes that, e.g. for handlers that hold a connection while they wait:
 
 ```php
 function handle(string $method, string $path, string $body): string {
@@ -361,12 +425,43 @@ function handle(string $method, string $path, string $body): string {
 serve(8080, "handle");
 ```
 
+Rows into objects: `list<Order> $os = db_all($db, "SELECT id, item, qty FROM orders", []);` and
+`?Order $o = db_one($db, "SELECT id, item, qty FROM orders WHERE id = ?", [strval($id)]);` (null when no row).
+The class comes from where the value goes; the column names are its constructor's parameters. A row that does
+not fit panics (a bug); under Tack, `tack check` compares the columns with the class.
+
 - **The SQL must be a string literal**; values go in `?` placeholders and the list (`list<string>` is
   simplest — SQLite converts `"2"` for INTEGER columns). Building SQL from variables does not compile.
 - `db_exec` returns rows changed, or -1 when a constraint refuses (`db_error($db)` says which); bad SQL panics.
 - Row by row: `$r = db_query(...); while (db_next($r)) { db_int($r, "qty"); db_string($r, "item"); }`.
   NULL reads as 0 / `""`; check with `db_is_null`.
+- Optional filters and sorting: build the SQL in a variable **from literals only**, choosing pieces with `if`;
+  values still go in `?`: `$sql = "SELECT id, item FROM orders WHERE 1 = 1"; if ($item != "") { $sql .= " AND
+  item = ?"; $ps[] = $item; } if ($sort == "qty") { $sql .= " ORDER BY qty"; }`. Appending a non-literal
+  (`$sql .= $sort`) does not compile. Secrets such as a database URL: `env("DATABASE_URL")`.
+- **PostgreSQL**: the same functions — `$db = db_open(env("DATABASE_URL"));` with
+  `postgres://user:password@host/name` (a `postgres://` literal in the code does not compile). Differences:
+  no `db_last_id` (it panics) — use `$r = db_query($db, "INSERT ... VALUES (?) RETURNING id", [...]);
+  db_next($r); db_int($r, "id")`; insert-unless-exists with `ON CONFLICT (name) DO NOTHING RETURNING id` (no row
+  back = already there; works in SQLite too); `db_int` is strict (a non-integer panics); `bool` reads as
+  `db_int` 1/0 and `db_string` `"t"`/`"f"`; `db_json` keeps `json`/`jsonb` as JSON. Use `SET LOCAL` inside
+  `BEGIN ... COMMIT`, never plain `SET` (does not compile: connections are reused). A query never blocks the
+  thread; `request_deadline()` cuts it with 504.
 - Every `db_*` function: [reference/database.md](https://github.com/pin-language/docs/blob/HEAD/reference/database.md).
+
+`json_decode` errors (all code 400, message = path + reason): `$: missing field "qty"`, `$: unknown field
+"extra"` (unknown fields are refused, not ignored; with a constructor, the fields are its parameters), `$: field "qty" appears twice`, `$.qty: want an integer, got
+a string`, `invalid JSON: ... at byte N`; a constructor's own `throw error(400, "...")` comes through as it is.
+
+Session tokens in a database: store `hash("sha256", $token)` and look the row up by that hash
+(`WHERE token_hash = ?`): the client cannot steer a comparison against a value it does not know, and a stolen
+database does not contain usable tokens. `hash_equals` is for comparing two secrets in memory (an API key from
+the environment, an HMAC signature).
+
+Sign-in and secrets: store `password_hash($password)` (PBKDF2-SHA256, slow on purpose: ~0.04 s on arm64, ~0.5 s on x86 — only at sign-up / login) and check
+with `password_verify($password, $hash)`. Session tokens and API keys: `random_token(16)`, compared with
+`hash_equals($known, $given)` (never `==`). Signatures: `hash_hmac("sha256", $data, $key)`. Random numbers:
+`random_int($min, $max)` (there is no `rand()`). `hash()` / `hash_hmac()` accept only `"sha256"`.
 
 Headers: `request_header("Authorization")` → string (`""` if absent; name case-insensitive),
 `request_has_header("X-Api-Key")` → bool, `response_header("Location", "/orders/7")` (repeat for several
@@ -438,8 +533,8 @@ initialize, ids, notifications and errors; its README has a complete server.
 | PHP | Pin |
 |---|---|
 | `array(1, 2)`, `[]` untyped | `[1, 2]`, `list<int> $a = [];` |
-| `$a = ["x" => 1, "y" => "s"]` (mixed) | one value type per map; build JSON strings for mixed objects |
-| `null`, `?int` | not yet — use `-1`, `""`, empty list, or a separate `bool` |
+| `$a = ["x" => 1, "y" => "s"]` (mixed) | one value type per map; for a mixed JSON object, a class and `json_encode` |
+| `null`, `?User`, `?string`, `?int` | the same; check before use (`!== null`, `??`) |
 | `class`, `new`, `->`, `$this` | the same; no `extends` / `interface` / `static`; objects move on `=` |
 | `function f(array &$a)`, `f($a)` | `function f(list<int> &$a)`, `f(&$a)` — `&` at the call too |
 | `throw new InvalidArgumentException("x")` | `throw error(400, "x");` in a function declared `: T throws` |
@@ -451,14 +546,14 @@ initialize, ids, notifications and errors; its README has a complete server.
 | `global`, `static`, `const`, `define` | parameters / local variables |
 | `strpos(...) === false` | `strpos(...) < 0` |
 | `explode`, `implode`, `sort`, `rsort` | the same (`sort($xs)` needs a list variable you own) |
-| `array_map`, `in_array`, `max`, `sprintf`, `usort`… | write the loop; the error message names the replacement |
+| `array_walk`… | write the loop; the error message names the replacement (`in_array`, `max`/`min`, `str_replace`, `round`, `array_keys`, `htmlspecialchars`, `base64_*`, `number_format`, `sprintf`, `date`, and `usort` / `array_map` / `array_filter` / `array_reduce` with closures, `ksort`/`asort`, `range`, `**`, math functions, `filter_var` (null when invalid), `ctype_*` exist) |
 | `$_SERVER["HTTP_AUTHORIZATION"]`, `getallheaders()` | `request_header("Authorization")` |
 | `header("Location: /x")`, `setcookie(...)` | `response_header("Location", "/x")`, `response_header("Set-Cookie", "...")` |
 | `$_GET["x"]`, `$_POST["x"]` | `query_param($path, "x")`, `form_param($body, "x")` |
-| `new PDO(...)`, `$stmt->execute([...])`, `fetch()` | `db_open`, `db_exec` / `db_query` + `db_next`, or `db_json` for a JSON array |
-| `json_decode($body, true)["a"]["b"]` | `json_int(json_raw($body, "a"), "b")` — one level at a time |
+| `new PDO(...)`, `$stmt->execute([...])`, `fetch()` | `db_open`, `db_exec` / `db_query` + `db_next`, `db_json` for a JSON array, `db_all` / `db_one` into a class |
+| `json_decode($body, true)` into arrays | a class + `Order $o = try json_decode($body);` (checked field by field); or read single values with `json_int(json_raw($body, "a"), "b")` |
 | `fgets(STDIN)` | `try read_line()` |
-| `json_decode($body, true)["x"]` | `json_string($body, "x")` / `json_int` / `json_float` / `json_bool` / `json_has` (top level only) |
+| `json_decode($body, true)["x"]` | `json_string($body, "x")` / `json_int` / `json_float` / `json_bool` / `json_has` (lenient: `""` / `0` when missing) |
 | `(bool)$x`, truthiness | compare explicitly |
 | `$s + 1` on strings | `intval($s) + 1` |
 | `list($a, $b) = ...` | assign separately |
@@ -467,16 +562,25 @@ initialize, ids, notifications and errors; its README has a complete server.
 | `file_get_contents("http://...")`, curl | `try http_get($url, [], 5000)` (http:// only) |
 | Swoole / ReactPHP coroutines, `Promise` | `$t = go f(); ... try await $t;` |
 | `foreach ($xs as &$x)` | the same (not for bools); the `&` variable is gone after the loop |
-| default parameter values `int $n = 1` | not yet — pass every argument |
+| default parameter values `int $n = 1` | the same, literals only, last in the list (no named arguments) |
 
 ## Built-ins (complete list)
 
 <!-- builtins:start (generated by tools/gen_docs.py in the pin repo) -->
-`strlen substr strpos str_contains str_starts_with str_ends_with str_repeat strtolower strtoupper trim explode implode count fill copy sort rsort isset array_key_exists unset intdiv sqrt wrapping_add wrapping_sub wrapping_mul intval floatval strval json_encode json_raw json_len json_at json_has json_string json_int json_float json_bool serve http_status request_header request_has_header response_header url_path query_param query_has form_param form_has db_open db_exec db_query db_next db_int db_float db_string db_is_null db_json db_last_id db_error error sleep_ms await_all await_timeout hub_publish hub_subscribe hub_resume hub_next hub_last_id sse_start sse_send sse_send_id sse_comment http_get http_post http_stream stream_next stream_last_id read_line run` · constants `PHP_EOL PHP_INT_MAX PHP_INT_MIN` · casts `(int)` from float/bool/string, `(float)` from int/string, `(string)` from int/float/bool. Details and examples for each: https://github.com/pin-language/docs/blob/HEAD/reference/README.md
+`ord chr rawurlencode strlen substr ctype_digit ctype_alpha ctype_alnum ctype_space ctype_upper ctype_lower ctype_xdigit nl2br mb_str_split mb_strlen mb_substr mb_strpos mb_chr mb_ord grapheme_strlen grapheme_substr mb_strtolower mb_strtoupper normalizer_normalize strpos str_contains str_starts_with str_ends_with str_repeat strtolower strtoupper trim sprintf printf date str_pad mb_str_pad ucwords strrev is_numeric str_replace ltrim rtrim ucfirst lcfirst htmlspecialchars base64_encode base64_decode rawurldecode urldecode number_format explode implode array_map array_filter array_key_first array_key_last ksort krsort asort arsort range array_count_values array_flip array_combine array_reduce usort array_pop array_shift array_slice array_merge array_reverse array_search array_unique in_array array_keys array_values array_sum count fill copy sort rsort isset array_key_exists unset intdiv round floor ceil abs max min pow fmod log log10 exp sin cos tan asin acos atan atan2 pi is_nan is_finite is_infinite sqrt wrapping_add wrapping_sub wrapping_mul time intval floatval strval json_validate json_encode json_raw json_len json_at json_has json_decode json_string json_int json_float json_bool serve http_status request_header request_has_header request_ip response_header url_path query_param query_has form_param form_has db_open db_pool db_exec db_query db_next db_int db_float db_string db_is_null db_json db_all db_one db_last_id db_error error sleep_ms await_all await_timeout hub_publish hub_subscribe hub_resume hub_next hub_last_id request_deadline sse_start sse_send sse_send_id sse_comment http_get http_post http_stream stream_next stream_last_id read_line run env filter_var hash hash_hmac hash_equals random_token random_int password_hash password_verify` · constants `STR_PAD_LEFT STR_PAD_RIGHT STR_PAD_BOTH PHP_EOL M_PI M_E NAN INF PHP_FLOAT_EPSILON PHP_FLOAT_MAX PHP_FLOAT_MIN PHP_INT_MAX PHP_INT_MIN JSON_PRETTY_PRINT JSON_UNESCAPED_SLASHES JSON_UNESCAPED_UNICODE JSON_THROW_ON_ERROR FILTER_VALIDATE_EMAIL FILTER_VALIDATE_URL FILTER_VALIDATE_IP FILTER_VALIDATE_INT FILTER_VALIDATE_FLOAT FILTER_VALIDATE_BOOL FILTER_VALIDATE_BOOLEAN` · casts `(int)` from float/bool/string, `(float)` from int/string, `(string)` from int/float/bool. Details and examples for each: https://github.com/pin-language/docs/blob/HEAD/reference/README.md
 <!-- builtins:end -->
 
-String functions count bytes (`strlen("ไทย")` is 9). `/` always gives a float; use `intdiv($a, $b)`.
-Ints wrap around on overflow.
+Strings are always valid UTF-8. `strlen` / `substr` / `strpos` count bytes (`strlen("ไทย")` is 9), and a
+`substr()` that would cut a character in half panics; positions from `strpos()` are always safe. `mb_strlen` /
+`mb_substr` / `mb_strpos` count code points; **to shorten text for display use `grapheme_substr()`** (keeps Thai
+vowels and tone marks, and emoji, whole). `mb_strtolower()` / `mb_strtoupper()` for non-ASCII letters;
+**usernames, emails and lookup keys: `normalizer_normalize($s, Normalizer::FORM_KC)` before storing and before
+comparing** (`$key = normalizer_normalize(mb_strtolower($email), Normalizer::FORM_KC);` into a `UNIQUE` column:
+`"Café"` and `"Cafe" . mb_chr(769)` are then one user). `chr()` above 127 panics: use `mb_chr()`. Text from outside that is not
+UTF-8 (a header, a database column, another server) arrives with U+FFFD in place of the bad bytes; a request
+body or path that is not UTF-8 gets 400. `/` always gives a float; use `intdiv($a, $b)`.
+Ints wrap around on overflow. Bit operators `| & ^ ~ << >>` work on ints; `0xFF`, `0b1010`, `1_000_000` literals.
+`json_encode($v, JSON_PRETTY_PRINT)` indents with 4 spaces, as PHP. `array_pop($xs)` / `array_shift($xs)` give `?T` (null when empty).
 
 ## Errors → fixes
 
@@ -486,6 +590,8 @@ Ints wrap around on overflow.
 | `may have been moved on line N (on one path…)` | copy in that branch, or reassign after the `if` |
 | `is moved inside a loop` | move after the loop, `copy()`, or `break` right after the move |
 | `may be used before it is assigned` | give it a value before the `if`/loop |
+| `is already T; a variable keeps one type` | use another name (the type holds for the whole function, every branch) |
+| `substr() would cut a character in half` | `grapheme_substr()` for display, `mb_substr()` for code points, or a position from `strpos()` |
 | `is a parameter lent to this function read-only` | declare `T &$p` and call with `&$x`, or `$copy = copy($p);` |
 | `can change its argument $x, so write f(&$x)` | add `&` at the call |
 | `borrows from it and is used again on line N` | finish using the borrowed variable first, or `copy()` it |

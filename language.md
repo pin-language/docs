@@ -26,6 +26,7 @@ pin check hello.pn        # errors only
 | `list<T>` | `[1, 2, 3]`, `["a", "b"]`, `[[1], [2, 3]]` | `T` is any type except `db`, `rows`, `void` |
 | `map<K,V>` | `["a" => 1]` | `K` is `int` or `string`; `V` any type except `db`, `rows`, `void`; keeps insertion order |
 | a class | `new Order(1)` | see [Classes](#classes) |
+| `fn(T1, T2): R` | `fn($x) => $x * 2`, `label(...)` | a function value, see [Closures](#closures) |
 | `db`, `rows` | `db_open("app.db")` | see [Database](#database-sqlite) |
 | `void` | | return type only |
 
@@ -52,11 +53,16 @@ echo $msg;         // fine
 
 ## Operators
 
-- Arithmetic: `+ - * %`, `/` (always gives a float, like PHP), `intdiv($a, $b)` for int division.
+- Arithmetic: `+ - * % **`, `/` (always gives a float, like PHP), `intdiv($a, $b)` for int division. `**` binds
+  tighter than unary minus and from the right (`-2 ** 2` is -4); int ** int is an int, a negative int exponent panics.
   `%` and `intdiv` follow PHP (round toward zero). Division by zero panics.
 - Compound: `+= -= *= /= %= .=`, `++`, `--`. `/=` needs a float variable.
-- Comparison: `== != < <= > >= === !==` (no implicit conversions between types).
+- Comparison: `== != < <= > >= === !==` (no implicit conversions between types), and `<=>` (-1, 0 or 1; for
+  `usort` comparisons: `return $a->price <=> $b->price;`).
 - Logic: `&& || !` — on `bool` only.
+- Bits (ints): `| & ^ ~ << >>` and `|= &= ^= <<= >>=`, with PHP 8's precedence (`&` binds looser than `==`, so
+  write `($flags & 4) != 0`). A shift by 64 or more gives 0 (`>>` of a negative: -1); a negative shift panics.
+  Literals: `0xFF`, `0b1010`, `0o17`, `1_000_000`.
 - Strings: `.` joins, `.=` appends. `"Hello $name"` and `"{$name}s"` interpolate.
 - `$cond ? $a : $b`, and `$m[$k] ?? $default` / `$list[$i] ?? $default`.
 - Casts: `(int)` (from float, bool or string), `(float)` (from int or string; `floatval()` does the same),
@@ -81,8 +87,10 @@ function area(float $w, float $h): float { return $w * $h; }
 function log_line(string $s): void { echo $s, "\n"; }
 ```
 
-Parameter and return types are required. Recursion works. There are no default values, no named
-arguments and no variadics yet.
+Parameter and return types are required. Recursion works. Parameters may have defaults, last in the list
+and written as literals like property defaults: `function page(string $q, int $limit = 20, bool $desc = false)`;
+a call leaves out trailing ones (`page("tea")`, `page("tea", 5)`). A `&` parameter cannot have one. There are
+no named arguments and no variadics yet.
 
 A parameter declared with `&` may change the caller's value; the call writes `&` too:
 
@@ -94,6 +102,38 @@ add_tax(&$price);
 
 The argument must be a variable or a path into one (`&$orders[0]`, `&$o->items`), and the other arguments of
 the same call may not use it.
+
+### Closures
+
+`fn($x) => expr` and `function ($x) use ($a, &$b) { ... }`, as in PHP; `label(...)` is the function `label` as a
+value; `$f($x)` calls one. Their type is written `fn(int): int` (`fn(Req): Res throws` for one that can fail).
+
+```php
+function discounter(int $percent): fn(int): int {
+    return fn(int $p): int => intdiv($p * (100 - $percent), 100);   // returned: keeps its own $percent
+}
+$limit = 50;
+$cheap = array_filter([30, 80, 45], fn($p) => $p < $limit);       // passed to a call: reads $limit
+$count = 0;
+$tick = function () use (&$count): void { $count++; };             // use (&): changes $count
+$tick();
+$tick();
+$tenOff = discounter(10);
+echo count($cheap), " ", $count, " ", $tenOff(4500), "\n";        // 2 2 4050
+```
+
+Where the closure goes decides what it does with the variables it uses (design/closures.md):
+- **Passed to a call or kept in a variable** (local): it reads them as loans, nothing is copied. While it can still
+  be called, they cannot change. Parameter types come from the expected `fn` type (`array_map`, `usort`, an `fn`
+  parameter); elsewhere write them.
+- **`use (&$x)`** (local closures only): a call of the closure changes `$x`, so it cannot be called inside a
+  `foreach` over `$x`, while something borrowed from `$x` is used later, or in an expression that also uses `$x`.
+- **Returned, stored in a property / list / map, or given to `go`**: it owns them. Ints, floats, bools and strings
+  are copied; lists, maps, objects and closures are moved (`copy($xs)` keeps one for you). It cannot use `$this` or
+  `use (&...)`. Such a closure is a value with one owner, like a list: freed with its owner, moved on assignment,
+  `copy()` copies what it holds.
+- An `fn` parameter is a loan like every parameter: to keep it, store `copy($f)` (a local closure's copy gets its
+  own values). A property is called with parentheses: `($this->onClick)($x)`.
 
 ## Lists and maps
 
@@ -334,7 +374,5 @@ http://127.0.0.1:9001 {                 # outgoing: Pin calls http://127.0.0.1:9
 
 ## Not in Pin yet
 
-Inheritance and interfaces, `null` and `?Type`, `finally`, default parameter values,
-closures, sorting with a custom comparison, a full `json_decode`
-(nested objects and arrays), databases other than SQLite (PostgreSQL is next), WebSocket. Designs for most of these are in
+Inheritance and interfaces, `finally`, WebSocket. Designs for most of these are in
 [`design/`](design/).

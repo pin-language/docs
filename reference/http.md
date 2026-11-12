@@ -8,12 +8,14 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`http_status`](#http_status) | Set the status code of the current response (default 200). |
 | [`request_header`](#request_header) | The value of a request header (name matched without case), or `""` when absent. |
 | [`request_has_header`](#request_has_header) | Whether the request has the header, also when its value is empty. |
+| [`request_ip`](#request_ip) | The client's IP address (the other end of the connection). |
 | [`response_header`](#response_header) | Add a header to the response (for example `Content-Type`, `Location`, `Cache-Control`, `Set-Cookie`). |
 | [`url_path`](#url_path) | The request path without its query string. |
 | [`query_param`](#query_param) | One value from the query string, decoded, or `""`. |
 | [`query_has`](#query_has) | Whether the query string has `$key`, even with an empty value. |
 | [`form_param`](#form_param) | One value from a form body (`a=1&b=2`), decoded, or `""`. |
 | [`form_has`](#form_has) | Whether a form body has `$key`. |
+| [`request_deadline`](#request_deadline) | Give the running request at most `$ms` milliseconds. |
 | [`sse_start`](#sse_start) | Turn the response into a Server-Sent Events stream (`text/event-stream`), sent as it is written. |
 | [`sse_send`](#sse_send) | Send one event (`data:` lines; a newline in the text starts a new line). |
 | [`sse_send_id`](#sse_send_id) | Send one event with an id; a reconnecting browser sends it back as the `Last-Event-ID` header. |
@@ -98,6 +100,27 @@ serve(8080, "handle");
 ```
 
 (Starts a server; not run in the docs.)
+
+## request_ip
+
+```php
+request_ip(): string
+```
+
+The client's IP address (the other end of the connection).
+
+```php
+function handle(string $method, string $path, string $body): string {
+    return json_encode(["you" => request_ip()]);        // {"you":"203.0.113.7"}
+}
+serve(8080, "handle");
+```
+
+(Starts a server; not run in the docs.)
+
+- IPv4 as `"203.0.113.7"`, IPv6 as `"2001:db8::1"`; `""` outside a request.
+- Behind a proxy (Caddy for https, design/tls.md) this is the proxy's address, usually `127.0.0.1`; the client's is then in `X-Forwarded-For`, which only a proxy you run may be trusted to set (Tack's `client_ip()` does that).
+- **PHP:** `$_SERVER['REMOTE_ADDR']`.
 
 ## response_header
 
@@ -224,6 +247,35 @@ Output:
 ```
 yn
 ```
+
+## request_deadline
+
+```php
+request_deadline(int $ms): void
+```
+
+Give the running request at most `$ms` milliseconds.
+
+```php
+function handle(string $method, string $path, string $body): string throws {
+    request_deadline(300);                     // the whole request, tasks included
+    $s = hub_subscribe("orders");
+    return try hub_next($s, 5000);             // ends at 300 ms with error 504
+}
+echo "inside serve() only\n";
+```
+
+Output:
+
+```
+inside serve() only
+```
+
+- When the time is up, every wait of the request ends — `await`, `sleep_ms`, `hub_next`, `http_get` / `http_post`, `run`, also inside its tasks — and fails with error 504; whatever the handler returns after that, the client gets `504 {"error":"Gateway Timeout"}`.
+- Code that computes without waiting is not interrupted: the deadline takes effect at its next wait.
+- Calling it again can only make the deadline earlier. Outside a `serve()` request it does nothing.
+- 1 to 3600000 ms (else panic).
+- **PHP:** Like `set_time_limit()` for one request, but it also stops the request's tasks and network waits.
 
 ## sse_start
 

@@ -34,15 +34,17 @@ The SQL has to be written in your program. Gluing a value into it does not compi
 
 <!-- check: error -->
 ```php
-$db = db_open(":memory:");
-$name = "tea'; DROP TABLE products; --";
-$rows = db_query($db, "SELECT * FROM products WHERE name = '" . $name . "'", []);
+function search(string $path): string {
+    $db = db_open(":memory:");
+    $name = query_param($path, "name");          // from the client: "tea'; DROP TABLE products; --"
+    return db_json($db, "SELECT * FROM products WHERE name = '" . $name . "'", []);
+}
 ```
 
 Error:
 
 ```text
-example.pn:3: error: db_query(): write the SQL as a string literal in the code and pass values with ? placeholders, e.g. db_query($db, "SELECT * FROM t WHERE id = ?", [strval($id)]). SQL built from variables could let a client inject SQL
+example.pn:4: error: db_json(): write the SQL as string literals in the code and pass values with ? placeholders, e.g. db_json($db, "SELECT * FROM t WHERE id = ?", [strval($id)]). A variable works too when it is built only from literals: $sql = "SELECT ..."; if ($sort == "qty") { $sql .= " ORDER BY qty"; }. SQL built from other values could let a client inject SQL
 ```
 
 With a placeholder, whatever the value contains is only ever data.
@@ -70,7 +72,7 @@ tea 40 hot
 cake 89 -
 ```
 
-Pin has no `null` yet, so a NULL column reads as `0` or `""`; ask `db_is_null` when it matters.
+A NULL column reads as `0` or `""`; ask `db_is_null` when it matters (`db_is_null($rows, "qty") ? null : db_int($rows, "qty")` gives a `?int`).
 
 ## Straight to JSON
 

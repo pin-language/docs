@@ -4,7 +4,8 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 
 | | |
 |---|---|
-| [`db_open`](#db_open) | Open (or create) an SQLite database file. |
+| [`db_open`](#db_open) | Open (or create) an SQLite database file, or a PostgreSQL database by URL. |
+| [`db_pool`](#db_pool) | Set the connection pool for one database file or PostgreSQL URL (optional). |
 | [`db_exec`](#db_exec) | Run INSERT, UPDATE, DELETE or CREATE; returns the rows changed. |
 | [`db_query`](#db_query) | Run a SELECT and get the rows one at a time. |
 | [`db_next`](#db_next) | Move to the next row; false when there are no more. |
@@ -13,6 +14,8 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 | [`db_string`](#db_string) | A column of the current row as text (NULL gives `""`). |
 | [`db_is_null`](#db_is_null) | Whether a column of the current row is NULL. |
 | [`db_json`](#db_json) | Run a SELECT and get all rows as a JSON array of objects. |
+| [`db_all`](#db_all) | Run a SELECT and get every row as an object of the class where the list goes. |
+| [`db_one`](#db_one) | Run a SELECT and get the first row as an object of the class where it goes, or null when there is none. |
 | [`db_last_id`](#db_last_id) | The id of the last row inserted on this connection. |
 | [`db_error`](#db_error) | Why the last `db_exec` returned -1, or `""`. |
 
@@ -22,7 +25,7 @@ Part of the [Pin built-in reference](README.md). Generated from `spec/pin_builti
 db_open(string $path): db
 ```
 
-Open (or create) an SQLite database file.
+Open (or create) an SQLite database file, or a PostgreSQL database by URL.
 
 ```php
 $db = db_open(":memory:");          // a file name like "shop.db", or ":memory:" for a temporary one
@@ -35,11 +38,40 @@ Output:
 0
 ```
 
-- The connection closes by itself when `$db` goes out of scope — at the end of the function, or when a handler panics.
-- Open one per request in a server: opening SQLite is fast, and WAL mode lets requests read and write in parallel. Writers wait up to 5 seconds for each other.
+- When `$db` goes out of scope (end of the function) the connection goes back to a pool the runtime keeps per server thread, so the next `db_open()` of the same file is almost free (~3 µs instead of ~80–200 µs). A connection comes back only clean: an open transaction is rolled back; after a handler panics it is closed.
+- Open one per request in a server — that is the intended use. WAL mode lets requests read and write in parallel; writers wait up to 5 seconds for each other.
+- `:memory:` and `""` are never pooled: each open is a new, empty database.
 - A file that cannot be opened panics. Foreign keys are enforced.
-- `db` values move like lists; pass `$db` to functions (they borrow it).
-- **PHP:** Pin's version of `new PDO('sqlite:shop.db')`. PostgreSQL is planned with the same functions.
+- `db` values move like lists; pass `$db` to functions (they borrow it). A task (`go`) cannot use the caller's `$db`: open one inside the task.
+- SQL that would change the connection for its next user (`PRAGMA foreign_keys = ...`, `ATTACH`, `CREATE TEMP ...`; for PostgreSQL `SET` without `LOCAL`, `RESET`, `LISTEN`, `PREPARE`, `DISCARD`, `set_config(..., false)`, `pg_advisory_lock()`) does not compile.
+- PostgreSQL: `db_open(env("DATABASE_URL"))` with `postgres://user:password@host:5432/name` (or `postgresql://`). The same `db_*` functions and `?` placeholders work; the URL as a literal in the code does not compile, so the password stays out of git. It needs PostgreSQL's client library at run time (Ubuntu/Debian `libpq5`, macOS `brew install libpq`); TLS options go in the URL (`?sslmode=require`).
+- PostgreSQL waits never block the thread: while one request waits for the database, the others run. A server that is down panics after up to 10 s; inside a handler that answers 503 (try again later), not 500.
+- **PHP:** Pin's version of `new PDO('sqlite:shop.db')` / `new PDO('pgsql:...')`.
+
+## db_pool
+
+```php
+db_pool(string $path, int $per_thread, int $idle_ms): void
+```
+
+Set the connection pool for one database file or PostgreSQL URL (optional).
+
+```php
+db_pool("shop.db", 8, 30000);    // up to 8 connections per server thread; close after 30 s unused
+echo "pool set\n";
+```
+
+Output:
+
+```
+pool set
+```
+
+- Without it each file gets 4 connections per thread, closed after 60 s unused.
+- Only at the top level of the program, before `serve()` (compile error inside a function).
+- When a thread's connections are all in use, `db_open()` waits (other requests keep running) for up to 5 seconds, then panics — a 503 inside a handler (clients may retry). A handler holds a connection while it waits (`sleep_ms`, `await`, `http_get`), so raise the limit for handlers like that.
+- PostgreSQL: threads × `$per_thread` must stay under the server's `max_connections` (100 by default); the program prints a warning at the first connection when it does not.
+- **PHP:** Like `PDO::ATTR_PERSISTENT` / `pg_pconnect`, but the connection is always returned clean.
 
 ## db_exec
 
@@ -64,7 +96,7 @@ Output:
 
 - The SQL must be a string literal in your code; every value goes in a `?` placeholder and in the list (`list<string>`, `list<int>` or `list<float>`). SQL built from variables does not compile, so a client cannot inject SQL.
 - Returns -1 when a constraint (UNIQUE, NOT NULL, CHECK, FOREIGN KEY) refuses the change — `db_error($db)` says which. Any other error (bad SQL, wrong number of values) is a bug and panics.
-- One statement per call. Numbers can be passed as strings: SQLite stores `"2"` in an INTEGER column as 2.
+- One statement per call. Numbers can be passed as strings: SQLite stores `"2"` in an INTEGER column as 2, and PostgreSQL reads each value as the type its column or `?::type` asks for.
 
 ## db_query
 
@@ -140,6 +172,7 @@ Output:
 ```
 
 - A column name the query does not have, or reading before `db_next`, panics. Use `AS name` for computed columns.
+- PostgreSQL: strict — a value that is not a whole integer (`"12abc"`, `1.5`) panics; a `bool` column gives 1 or 0.
 
 ## db_float
 
@@ -185,6 +218,8 @@ Output:
 ชาเย็น 1
 ```
 
+- PostgreSQL gives its own text for each type: a `bool` is `"t"` or `"f"`, a `numeric(10,2)` keeps its zeros (`"1.50"`).
+
 ## db_is_null
 
 ```php
@@ -198,16 +233,21 @@ $db = db_open(":memory:");
 db_exec($db, "CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT UNIQUE, qty INTEGER, price REAL)", []);
 db_exec($db, "INSERT INTO items (name) VALUES (?)", ["tea"]);
 $rows = db_query($db, "SELECT name, qty FROM items", []);
-while (db_next($rows)) { echo db_is_null($rows, "qty") ? "qty is NULL" : "qty set", "\n"; }
+while (db_next($rows)) {
+    echo db_is_null($rows, "qty") ? "qty is NULL" : "qty set", "\n";
+    $qty = db_is_null($rows, "qty") ? null : db_int($rows, "qty");      // ?int
+    echo json_encode($qty), "\n";
+}
 ```
 
 Output:
 
 ```
 qty is NULL
+null
 ```
 
-- Pin has no `null` yet, so check this before trusting a 0 or `""` from a nullable column.
+- `db_int` / `db_float` / `db_string` read NULL as 0 / `""`, so check this before trusting them on a nullable column; `db_is_null(...) ? null : db_int(...)` gives a `?int`.
 
 ## db_json
 
@@ -232,7 +272,69 @@ Output:
 ```
 
 - Column names become keys; INTEGER, REAL, TEXT and NULL become JSON numbers, strings and `null`.
+- PostgreSQL: integer, float and numeric columns become numbers (`NaN` and `Infinity` strings), `bool` `true`/`false`, `json`/`jsonb` are included as they are, everything else (dates, uuid, text) a string.
 - The easiest way to answer an API request with query results — no loop, no string building.
+
+## db_all
+
+```php
+db_all(db $db, string $sql, list $params): list<T>
+```
+
+Run a SELECT and get every row as an object of the class where the list goes.
+
+```php
+class Item {
+    public function __construct(public int $id, public string $name, public ?int $qty = null) {}
+}
+$db = db_open(":memory:");
+db_exec($db, "CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT UNIQUE, qty INTEGER, price REAL)", []);
+db_exec($db, "INSERT INTO items (name, qty) VALUES ('tea', 2), ('cake', NULL)", []);
+list<Item> $items = db_all($db, "SELECT id, name, qty FROM items ORDER BY id", []);
+foreach ($items as $i) { echo $i->name, " ", $i->qty ?? 0, "\n"; }
+```
+
+Output:
+
+```
+tea 2
+cake 0
+```
+
+- The class comes from where the value goes: `list<Item> $xs = db_all(...)` or `return db_all(...)` from a function declared `: list<Item>`. Column names are the constructor's parameters (or the public properties); `?T` and parameters with a default may be missing, NULL gives null.
+- A row that does not fit (a missing or extra column, a wrong type, the constructor refuses it) is a bug in the program and **panics** (500 in a handler). Tack checks the columns against the class when you build.
+- SQLite has no booleans: read 0 / 1 into an `int`. Same SQL rules as `db_query()` (literal SQL, `?` values).
+- **PHP:** Like PDO's `fetchAll(PDO::FETCH_CLASS, Item::class)`, but typed and checked.
+
+## db_one
+
+```php
+db_one(db $db, string $sql, list $params): ?T
+```
+
+Run a SELECT and get the first row as an object of the class where it goes, or null when there is none.
+
+```php
+class Item {
+    public function __construct(public int $id, public string $name) {}
+}
+$db = db_open(":memory:");
+db_exec($db, "CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT UNIQUE, qty INTEGER, price REAL)", []);
+db_exec($db, "INSERT INTO items (name) VALUES ('tea')", []);
+?Item $t = db_one($db, "SELECT id, name FROM items WHERE name = ?", ["tea"]);
+?Item $x = db_one($db, "SELECT id, name FROM items WHERE name = ?", ["nope"]);
+echo $t?->name ?? "none", " ", $x?->name ?? "none", "\n";
+```
+
+Output:
+
+```
+tea none
+```
+
+- Write it as `?Item $i = db_one(...)`, then check: `if ($i === null) { throw error(404, "..."); }`.
+- Only the first row is read; add `LIMIT 1` when more could match. The same rules as `db_all()`.
+- **PHP:** Like PDO's `fetchObject()`, but typed: null instead of `false`.
 
 ## db_last_id
 
@@ -255,6 +357,9 @@ Output:
 ```
 2
 ```
+
+- PostgreSQL has no last insert id: write `INSERT ... RETURNING id` and read it with `db_query` (it panics on a PostgreSQL connection, saying so). `RETURNING` works in SQLite too.
+- To insert unless it exists: `INSERT ... ON CONFLICT (name) DO NOTHING RETURNING id` — no row back means it was there already.
 
 ## db_error
 
