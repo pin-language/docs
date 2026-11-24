@@ -63,7 +63,8 @@ Output:
 
 - Letters: `d D j l N S w z F m M n t L Y y a A g G h H i s v u e T P p O Z U c r`; `\` before a letter keeps it as it is. Anything else is copied.
 - Always UTC: Pin has no time zones yet (`T` is `UTC`, `P` is `+00:00`). For an API, `date("c")` (ISO 8601) or plain `time()` numbers are the usual choice.
-- **PHP:** Like `date()` with `date.timezone=UTC`.
+- A timestamp whose year does not fit in 32 bits (beyond about the year 2,147,483,647 either way) **panics**; a value from a request can reach it, so check the range first if it comes from outside.
+- **PHP:** Like `date()` with `date.timezone=UTC`, except for those huge timestamps: PHP prints their year (`date("Y", PHP_INT_MAX)` is 292277026596), Pin panics.
 
 ## intdiv
 
