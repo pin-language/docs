@@ -32,6 +32,7 @@ echo $health, "\n";
 - A status of 400 or more fails with that status as the code (the start of the body is in the message); 502 when the connection fails, 504 when there is no answer within `$ms`.
 - Only `http://`, by design: for an https API, call a local egress proxy (Caddy) on 127.0.0.1 that opens the https connection — see design/tls.md. An https:// URL fails with 400.
 - Header values with CR/LF panic. The name lookup itself still blocks the thread briefly.
+- A host that ends in a number must be a plain IPv4 address `a.b.c.d` without leading zeros, and the port must be digits 1-65535: `0x7f.1`, `2130706433`, `127.1` or `0177.0.0.1` fail with 400, because the system resolver reads them as addresses a check on the text would not expect.
 - **PHP:** Instead of `file_get_contents($url)` or curl.
 
 ## http_post

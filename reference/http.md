@@ -41,6 +41,7 @@ serve(8080, "handle");
 - The handler must be `function NAME(string $method, string $path, string $body): string`; its return value is the response body, sent as `application/json`.
 - One thread per CPU core (`PN_THREADS=n` to change), keep-alive and pipelining. A panic in the handler answers 500 and the server keeps running.
 - Speaks HTTP/1.1 without TLS, by design: put a reverse proxy (Caddy, nginx, a load balancer) in front for https. It has request/response headers, timeouts and connection limits (see the language guide).
+- A request whose request line or headers are not exactly what RFC 9112 allows (a space before `:`, a bare CR or LF, a folded line, a control byte, two `Host` headers) is refused with 400 before the handler runs, so a proxy in front cannot read it differently (request smuggling). `Transfer-Encoding` gets 501, HTTP/2.0 505.
 
 ## http_status
 
